@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>日常記帳</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="記帳">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="app-header">
+    <div class="nav-bar">
+      <button id="lang-btn" class="nav-btn left" type="button">EN</button>
+      <button id="cat-manage-btn" class="nav-btn" type="button" data-i18n="categories">分類</button>
+    </div>
+    <h1 class="large-title" data-i18n="appTitle">日常記帳</h1>
+  </header>
+
+  <!-- 明細 -->
+  <main id="view-list" class="view">
+    <div id="entry-list" class="entry-list"></div>
+    <div id="empty-state" class="empty-state" hidden>
+      <div class="empty-icon">✦</div>
+      <p data-i18n="emptyTitle">還沒有任何帳目</p>
+      <p class="empty-hint" data-i18n="emptyHint">點下方「＋」記下第一筆</p>
+    </div>
+  </main>
+
+  <!-- 報表 -->
+  <main id="view-report" class="view" hidden>
+    <div class="month-nav">
+      <button id="month-prev" class="month-arrow" type="button" aria-label="prev">‹</button>
+      <span id="month-label" class="month-label"></span>
+      <button id="month-next" class="month-arrow" type="button" aria-label="next">›</button>
+    </div>
+
+    <section class="card summary-card">
+      <div class="summary-caption" data-i18n="monthSpending">本月支出</div>
+      <div id="report-expense" class="summary-amount">RM 0.00</div>
+      <div class="summary-sub">
+        <span><span data-i18n="income">收入</span> <span id="report-income" class="num income-text">RM 0.00</span></span>
+        <span class="summary-divider"></span>
+        <span><span data-i18n="balance">結餘</span> <span id="report-balance" class="num">RM 0.00</span></span>
+      </div>
+    </section>
+
+    <div class="seg" id="report-seg">
+      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
+      <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
+    </div>
+
+    <section id="report-breakdown" class="card breakdown-card"></section>
+  </main>
+
+  <!-- 底部 Tab Bar -->
+  <nav class="tab-bar">
+    <button id="tab-list" class="tab-btn active" type="button">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5h16M4 12h16M4 17.5h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <span data-i18n="entries">明細</span>
+    </button>
+    <button id="add-btn" class="tab-add" type="button" aria-label="add">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
+    </button>
+    <button id="tab-report" class="tab-btn" type="button">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M5 20v-8M12 20V5M19 20v-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+      <span data-i18n="reports">報表</span>
+    </button>
+  </nav>
+
+  <!-- 記帳/編輯 面板 -->
+  <div id="sheet-backdrop" class="backdrop"></div>
+  <section id="sheet" class="sheet">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="sheet-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
+      <div class="seg seg-small" id="type-seg">
+        <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
+        <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
+      </div>
+      <button id="sheet-delete" class="sheet-header-btn danger" type="button" data-i18n="delete" hidden>刪除</button>
+    </div>
+
+    <div class="amount-display">
+      <span class="amount-currency">RM</span>
+      <span id="amount-text">0</span>
+    </div>
+
+    <div id="category-row" class="category-row"></div>
+
+    <div class="field-row">
+      <input id="note-input" class="field-input" type="text" data-i18n-ph="notePlaceholder" placeholder="備註（可空）" maxlength="60">
+      <input id="date-input" class="field-input date-input" type="date">
+    </div>
+
+    <div class="keypad">
+      <button class="key" data-key="1" type="button">1</button>
+      <button class="key" data-key="2" type="button">2</button>
+      <button class="key" data-key="3" type="button">3</button>
+      <button class="key" data-key="4" type="button">4</button>
+      <button class="key" data-key="5" type="button">5</button>
+      <button class="key" data-key="6" type="button">6</button>
+      <button class="key" data-key="7" type="button">7</button>
+      <button class="key" data-key="8" type="button">8</button>
+      <button class="key" data-key="9" type="button">9</button>
+      <button class="key" data-key="." type="button">·</button>
+      <button class="key" data-key="0" type="button">0</button>
+      <button class="key key-del" data-key="del" type="button">
+        <svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M8.4 5h10.1A2.5 2.5 0 0 1 21 7.5v9a2.5 2.5 0 0 1-2.5 2.5H8.4a2 2 0 0 1-1.5-.7L3 13.3a2 2 0 0 1 0-2.6l3.9-5A2 2 0 0 1 8.4 5Z" stroke="currentColor" stroke-width="1.7"/><path d="m11 9.5 5 5M16 9.5l-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <button id="save-btn" class="save-btn" type="button" data-i18n="save">儲存</button>
+  </section>
+
+  <!-- 分類管理 -->
+  <section id="cat-modal" class="modal">
+    <div class="nav-bar modal-nav">
+      <span class="nav-spacer"></span>
+      <span class="modal-title" data-i18n="manageCategories">分類管理</span>
+      <button id="cat-done-btn" class="nav-btn strong" type="button" data-i18n="done">完成</button>
+    </div>
+    <div class="seg" id="cat-seg">
+      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expenseCats">支出分類</button>
+      <button class="seg-btn" data-type="income" type="button" data-i18n="incomeCats">收入分類</button>
+    </div>
+    <div id="cat-list" class="cat-list"></div>
+  </section>
+
+  <!-- 分類編輯器 -->
+  <div id="cat-editor-backdrop" class="backdrop editor-backdrop"></div>
+  <section id="cat-editor" class="sheet cat-editor">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="cat-editor-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
+      <span id="cat-editor-title" class="sheet-title">編輯分類</span>
+      <button id="cat-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">儲存</button>
+    </div>
+    <input id="cat-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="categoryName" placeholder="分類名稱" maxlength="12">
+    <div id="color-grid" class="color-grid"></div>
+    <button id="cat-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteCategory" hidden>刪除分類</button>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
