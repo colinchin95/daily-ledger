@@ -22,9 +22,17 @@ const STRINGS = {
     balance: '結餘',
     noExpense: '本月沒有支出記錄',
     noIncome: '本月沒有收入記錄',
-    manageCategories: '分類管理',
+    settings: '設定',
+    categoriesSection: '分類',
     expenseCats: '支出分類',
     incomeCats: '收入分類',
+    backupSection: '資料備份',
+    exportBackup: '匯出 JSON 備份',
+    importBackup: '匯入 JSON 備份',
+    backupHint: '帳目只存在這台裝置上,建議定期匯出備份。',
+    importInvalid: '這個檔案不是有效的記帳備份。',
+    importConfirmMerge: (n) => `備份包含 ${n} 筆帳目,將與現有資料合併(相同項目以備份內容為準)。繼續?`,
+    importDone: (n, m) => `已匯入 ${n} 筆帳目、${m} 個分類。`,
     newCategory: '新增分類',
     editCategory: '編輯分類',
     categoryName: '分類名稱',
@@ -56,9 +64,18 @@ const STRINGS = {
     balance: 'Balance',
     noExpense: 'No expenses this month',
     noIncome: 'No income this month',
-    manageCategories: 'Categories',
+    settings: 'Settings',
+    categoriesSection: 'Categories',
     expenseCats: 'Expense',
     incomeCats: 'Income',
+    backupSection: 'Backup',
+    exportBackup: 'Export JSON backup',
+    importBackup: 'Import JSON backup',
+    backupHint: 'Your data lives only on this device — export a backup regularly.',
+    importInvalid: 'This file is not a valid ledger backup.',
+    importConfirmMerge: (n) =>
+      `The backup contains ${n} ${n === 1 ? 'entry' : 'entries'} and will be merged with your current data (backup wins on conflicts). Continue?`,
+    importDone: (n, m) => `Imported ${n} ${n === 1 ? 'entry' : 'entries'} and ${m} ${m === 1 ? 'category' : 'categories'}.`,
     newCategory: 'New Category',
     editCategory: 'Edit Category',
     categoryName: 'Category name',
@@ -611,6 +628,86 @@ async function onCatDelete() {
   if (!viewReportEl.hidden) renderReport();
 }
 
+// ---------- 資料備份:JSON 匯出 / 匯入 ----------
+function exportBackup() {
+  const payload = {
+    app: 'daily-ledger',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    categories,
+    entries,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `daily-ledger-backup-${todayStr()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function sanitizeEntry(e) {
+  if (!e || typeof e !== 'object') return null;
+  const cents = Math.round(Number(e.amountCents));
+  if (!Number.isFinite(cents) || cents <= 0) return null;
+  return {
+    id: typeof e.id === 'string' && e.id ? e.id : crypto.randomUUID(),
+    amountCents: cents,
+    type: e.type === 'income' ? 'income' : 'expense',
+    categoryId: typeof e.categoryId === 'string' ? e.categoryId : '',
+    note: typeof e.note === 'string' ? e.note.slice(0, 60) : '',
+    date: DATE_RE.test(e.date) ? e.date : todayStr(),
+    createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
+  };
+}
+
+function sanitizeCategory(c) {
+  if (!c || typeof c !== 'object' || typeof c.name !== 'string' || !c.name.trim()) return null;
+  return {
+    id: typeof c.id === 'string' && c.id ? c.id : crypto.randomUUID(),
+    name: c.name.trim().slice(0, 12),
+    color: /^#[0-9a-fA-F]{6}$/.test(c.color) ? c.color : '#8C95A3',
+    type: c.type === 'income' ? 'income' : 'expense',
+  };
+}
+
+async function onImportFile(file) {
+  if (!file) return;
+  let data;
+  try {
+    data = JSON.parse(await file.text());
+  } catch {
+    alert(t('importInvalid'));
+    return;
+  }
+  const inEntries = Array.isArray(data?.entries) ? data.entries.map(sanitizeEntry).filter(Boolean) : [];
+  const inCats = Array.isArray(data?.categories) ? data.categories.map(sanitizeCategory).filter(Boolean) : [];
+  if (!inEntries.length && !inCats.length) {
+    alert(t('importInvalid'));
+    return;
+  }
+  if (entries.length && !confirm(t('importConfirmMerge', inEntries.length))) return;
+
+  // 以 id 合併(同 id 以備份為準),不會弄丟現有資料
+  const entryMap = new Map(entries.map((x) => [x.id, x]));
+  for (const x of inEntries) entryMap.set(x.id, x);
+  entries = [...entryMap.values()];
+
+  const catMapById = new Map(categories.map((x) => [x.id, x]));
+  for (const x of inCats) catMapById.set(x.id, x);
+  categories = [...catMapById.values()];
+
+  await Promise.all([saveEntries(entries), saveCategories(categories)]);
+  renderList();
+  renderReport();
+  renderCatList();
+  alert(t('importDone', inEntries.length, inCats.length));
+}
+
 // ---------- 事件繫結 ----------
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
 
@@ -656,6 +753,13 @@ catSegEl.querySelectorAll('.seg-btn').forEach((btn) =>
     renderCatList();
   })
 );
+$('#export-btn').addEventListener('click', exportBackup);
+$('#import-btn').addEventListener('click', () => $('#import-file').click());
+$('#import-file').addEventListener('change', (e) => {
+  onImportFile(e.target.files[0]);
+  e.target.value = '';
+});
+
 $('#cat-editor-cancel').addEventListener('click', closeCatEditor);
 catEditorBackdropEl.addEventListener('click', closeCatEditor);
 $('#cat-editor-save').addEventListener('click', onCatSave);
