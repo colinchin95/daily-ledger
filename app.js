@@ -30,6 +30,11 @@ const STRINGS = {
     exportBackup: '匯出 JSON 備份',
     importBackup: '匯入 JSON 備份',
     backupHint: '帳目只存在這台裝置上,建議定期匯出備份。',
+    appSection: 'App',
+    updateLatest: '更新到最新版',
+    updateHint: '下載最新版本並重新整理(資料不受影響)。',
+    updating: '更新中…',
+    offlineNoUpdate: '目前離線,連上網路後再更新。',
     back: '返回',
     importInvalid: '這個檔案不是有效的記帳備份。',
     importConfirmMerge: (n) => `備份包含 ${n} 筆帳目,將與現有資料合併(相同項目以備份內容為準)。繼續?`,
@@ -73,6 +78,11 @@ const STRINGS = {
     exportBackup: 'Export JSON backup',
     importBackup: 'Import JSON backup',
     backupHint: 'Your data lives only on this device — export a backup regularly.',
+    appSection: 'App',
+    updateLatest: 'Update to latest',
+    updateHint: 'Download the latest version and reload. Your data is untouched.',
+    updating: 'Updating…',
+    offlineNoUpdate: 'You are offline — reconnect to update.',
     back: 'Back',
     importInvalid: 'This file is not a valid ledger backup.',
     importConfirmMerge: (n) =>
@@ -93,6 +103,9 @@ const STRINGS = {
 };
 
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
+
+// App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
+const APP_VERSION = 'v5';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -826,6 +839,34 @@ async function onImportFile(file) {
   alert(t('importDone', inEntries.length, inCats.length));
 }
 
+// ---------- 更新到最新版 ----------
+async function forceUpdate() {
+  // 離線時清快取會讓 App 開不起來,因此只在連線時更新
+  if (!navigator.onLine) {
+    alert(t('offlineNoUpdate'));
+    return;
+  }
+  const btn = $('#refresh-btn');
+  const label = btn.querySelector('.cat-row-name');
+  label.textContent = t('updating');
+  btn.disabled = true;
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg) {
+        await reg.update();                                  // 抓取新的 sw.js
+        if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+      }
+    }
+    if (window.caches) {
+      for (const k of await caches.keys()) await caches.delete(k); // 清掉舊殼層快取
+    }
+  } catch {
+    /* 即使更新檢查失敗,仍重新載入以套用任何已下載的新版本 */
+  }
+  location.reload();
+}
+
 // ---------- 事件繫結 ----------
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
 
@@ -877,6 +918,7 @@ $('#import-file').addEventListener('change', (e) => {
   onImportFile(e.target.files[0]);
   e.target.value = '';
 });
+$('#refresh-btn').addEventListener('click', forceUpdate);
 
 $('#detail-back-btn').addEventListener('click', closeCatDetail);
 
@@ -889,6 +931,7 @@ catDeleteBtn.addEventListener('click', onCatDelete);
 async function init() {
   buildFormatters();
   applyLanguage();
+  $('#app-version').textContent = APP_VERSION;
   [entries, categories] = await Promise.all([getEntries(), getCategories()]);
   renderList();
 

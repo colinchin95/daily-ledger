@@ -147,6 +147,16 @@
     </div>
     <p class="backup-hint" data-i18n="backupHint">帳目只存在這台裝置上,建議定期匯出備份。</p>
     <input type="file" id="import-file" accept=".json,application/json" hidden>
+
+    <div class="section-label" data-i18n="appSection">App</div>
+    <div class="cat-list">
+      <button id="refresh-btn" class="cat-row cat-row-add" type="button">
+        <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 4v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="cat-row-name" data-i18n="updateLatest">更新到最新版</span>
+        <span id="app-version" class="cat-row-count"></span>
+      </button>
+    </div>
+    <p class="backup-hint" data-i18n="updateHint">下載最新版本並重新整理(資料不受影響)。</p>
   </section>
 
   <!-- 分類編輯器 -->

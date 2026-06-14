@@ -1,6 +1,6 @@
 // Service Worker:App 殼層快取,離線也能開
 // 改版時把 VERSION +1,舊快取會在 activate 時清掉
-const VERSION = 'daily-ledger-v4';
+const VERSION = 'daily-ledger-v5';
 
 const SHELL = [
   './',
@@ -29,6 +29,11 @@ self.addEventListener('activate', (event) => {
       .then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
+});
+
+// 收到「更新到最新版」指令時,立即啟用等待中的新版本
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 // 快取優先、背景更新(stale-while-revalidate):
