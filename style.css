@@ -592,8 +592,51 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 
 .modal.open { transform: translate(-50%, 0); }
 
+/* 分類明細覆蓋層:在報表之上、但在記帳面板(z20/21)之下 */
+.modal.detail-level { z-index: 18; }
+
 .modal-nav { margin-bottom: 14px; }
 .modal-title { font-size: 17px; font-weight: 600; }
+
+/* ---------- 分類明細 ---------- */
+.detail-summary {
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-2);
+  padding: 2px 8px 16px;
+}
+
+.detail-summary .detail-total {
+  display: block;
+  font-size: 30px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.detail-summary .detail-total.income-text { color: var(--green); }
+
+.detail-row { gap: 10px; }
+.detail-date {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  min-width: 52px;
+}
+.detail-note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-note.muted { color: var(--text-3); }
+.detail-amount { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+.detail-amount.income-text { color: var(--green); }
+
+.detail-empty { text-align: center; color: var(--text-3); font-size: 14px; padding: 40px 0; }
+
+/* 報表分類列可點擊提示 */
+.breakdown-row { width: 100%; border: none; background: none; text-align: left; font: inherit; color: inherit; cursor: pointer; }
+.breakdown-row:active { opacity: 0.6; }
+.breakdown-chev { color: var(--text-3); font-size: 17px; margin-left: 8px; flex: none; }
 
 .section-label {
   font-size: 13px;

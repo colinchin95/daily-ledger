@@ -163,6 +163,17 @@
     <button id="cat-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteCategory" hidden>刪除分類</button>
   </section>
 
+  <!-- 分類明細(點報表分類進入) -->
+  <section id="detail-modal" class="modal detail-level">
+    <div class="nav-bar modal-nav">
+      <button id="detail-back-btn" class="nav-btn left" type="button">‹ <span data-i18n="back">返回</span></button>
+      <span id="detail-title" class="modal-title"></span>
+      <span class="nav-spacer"></span>
+    </div>
+    <div id="detail-summary" class="detail-summary"></div>
+    <div id="detail-list" class="cat-list"></div>
+  </section>
+
   <script type="module" src="app.js"></script>
 </body>
 </html>

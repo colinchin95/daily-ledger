@@ -30,6 +30,7 @@ const STRINGS = {
     exportBackup: '匯出 JSON 備份',
     importBackup: '匯入 JSON 備份',
     backupHint: '帳目只存在這台裝置上,建議定期匯出備份。',
+    back: '返回',
     importInvalid: '這個檔案不是有效的記帳備份。',
     importConfirmMerge: (n) => `備份包含 ${n} 筆帳目,將與現有資料合併(相同項目以備份內容為準)。繼續?`,
     importDone: (n, m) => `已匯入 ${n} 筆帳目、${m} 個分類。`,
@@ -72,6 +73,7 @@ const STRINGS = {
     exportBackup: 'Export JSON backup',
     importBackup: 'Import JSON backup',
     backupHint: 'Your data lives only on this device — export a backup regularly.',
+    back: 'Back',
     importInvalid: 'This file is not a valid ledger backup.',
     importConfirmMerge: (n) =>
       `The backup contains ${n} ${n === 1 ? 'entry' : 'entries'} and will be merged with your current data (backup wins on conflicts). Continue?`,
@@ -98,7 +100,7 @@ function t(key, ...args) {
 }
 
 // ---------- 金額工具:儲存與計算全用整數「分」,只有顯示才轉換 ----------
-let myrFmt, dateFmt, monthFmt;
+let myrFmt, dateFmt, monthFmt, shortDateFmt;
 
 function buildFormatters() {
   const locale = lang === 'en' ? 'en-MY' : 'zh-Hant';
@@ -116,6 +118,12 @@ function buildFormatters() {
       : { month: 'long', day: 'numeric', weekday: 'short' }
   );
   monthFmt = new Intl.DateTimeFormat(locale, { year: 'numeric', month: 'long' });
+  shortDateFmt = new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' });
+}
+
+function shortDate(dateStr) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return shortDateFmt.format(new Date(y, m - 1, d));
 }
 
 // 顯示成「RM 12.50」(currency 符號後保證一個空格)
@@ -219,6 +227,12 @@ const catNameInput = $('#cat-name-input');
 const colorGridEl = $('#color-grid');
 const catDeleteBtn = $('#cat-delete-btn');
 
+const detailModalEl = $('#detail-modal');
+const detailTitleEl = $('#detail-title');
+const detailSummaryEl = $('#detail-summary');
+const detailListEl = $('#detail-list');
+let detailCatId = null;   // 目前開啟的分類明細(null = 未開啟)
+
 const catMap = () => new Map(categories.map((c) => [c.id, c]));
 const catsOfType = (type) => categories.filter((c) => c.type === type);
 
@@ -271,6 +285,7 @@ function setLang(l) {
   renderList();
   renderReport();
   renderCatList();
+  if (detailCatId !== null) renderCatDetail();
   $('#cat-editor-title').textContent = editingCatId ? t('editCategory') : t('newCategory');
 }
 
@@ -384,6 +399,7 @@ function renderReport() {
   }
   const rows = [...byCat.entries()]
     .map(([catId, cents]) => ({
+      id: catId,
       name: catName(cats.get(catId)),
       color: cats.get(catId)?.color ?? '#8C95A3',
       cents,
@@ -401,7 +417,8 @@ function renderReport() {
 
   for (const row of rows) {
     const pct = (row.cents / total) * 100; // 僅用於顯示比例
-    const div = document.createElement('div');
+    const div = document.createElement('button');
+    div.type = 'button';
     div.className = 'breakdown-row';
     div.innerHTML = `
       <div class="breakdown-top">
@@ -409,6 +426,7 @@ function renderReport() {
         <span class="breakdown-name"></span>
         <span class="breakdown-pct"></span>
         <span class="breakdown-amount num"></span>
+        <span class="breakdown-chev">›</span>
       </div>
       <div class="breakdown-bar-track"><div class="breakdown-bar"></div></div>`;
     div.querySelector('.cat-dot').style.background = row.color;
@@ -418,8 +436,76 @@ function renderReport() {
     const bar = div.querySelector('.breakdown-bar');
     bar.style.background = row.color;
     bar.style.width = `${pct.toFixed(1)}%`;
+    div.addEventListener('click', () => openCatDetail(row.id));
     breakdownEl.appendChild(div);
   }
+}
+
+// ---------- 分類明細(點報表分類進入) ----------
+function renderCatDetail() {
+  if (detailCatId === null) return;
+  const cats = catMap();
+  const cat = cats.get(detailCatId);
+  const key = monthKey(reportMonth);
+  const isIncome = reportType === 'income';
+
+  const rows = entries
+    .filter((e) => e.categoryId === detailCatId && e.date.startsWith(key) && (e.type === 'income') === isIncome)
+    .sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
+
+  const total = rows.reduce((s, e) => s + e.amountCents, 0);
+
+  detailTitleEl.textContent = catName(cat);
+  detailSummaryEl.innerHTML = `<span class="detail-total num"></span><span class="detail-sub"></span>`;
+  const totalEl = detailSummaryEl.querySelector('.detail-total');
+  totalEl.textContent = (isIncome ? '+' : '') + formatRM(total);
+  totalEl.classList.toggle('income-text', isIncome);
+  detailSummaryEl.querySelector('.detail-sub').textContent =
+    `${monthFmt.format(new Date(reportMonth.y, reportMonth.m - 1, 1))} · ${t('entryCount', rows.length)}`;
+
+  detailListEl.innerHTML = '';
+  if (!rows.length) {
+    const empty = document.createElement('div');
+    empty.className = 'detail-empty';
+    empty.textContent = isIncome ? t('noIncome') : t('noExpense');
+    detailListEl.appendChild(empty);
+    return;
+  }
+
+  for (const entry of rows) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'cat-row detail-row';
+    item.innerHTML = `
+      <span class="detail-date"></span>
+      <span class="detail-note"></span>
+      <span class="detail-amount num"></span>`;
+    item.querySelector('.detail-date').textContent = shortDate(entry.date);
+    const noteEl = item.querySelector('.detail-note');
+    if (entry.note) {
+      noteEl.textContent = entry.note;
+    } else {
+      noteEl.textContent = catName(cat);
+      noteEl.classList.add('muted');
+    }
+    const amtEl = item.querySelector('.detail-amount');
+    amtEl.textContent = (isIncome ? '+' : '') + formatRM(entry.amountCents);
+    amtEl.classList.toggle('income-text', isIncome);
+    item.addEventListener('click', () => openSheet(entry));
+    detailListEl.appendChild(item);
+  }
+}
+
+function openCatDetail(catId) {
+  detailCatId = catId;
+  detailListEl.scrollTop = 0;
+  renderCatDetail();
+  detailModalEl.classList.add('open');
+}
+
+function closeCatDetail() {
+  detailModalEl.classList.remove('open');
+  detailCatId = null;
 }
 
 // ---------- 視圖切換 ----------
@@ -530,6 +616,7 @@ async function onSave() {
   closeSheet();
   renderList();
   if (!viewReportEl.hidden) renderReport();
+  if (detailCatId !== null) renderCatDetail();
 }
 
 async function onDelete() {
@@ -540,6 +627,7 @@ async function onDelete() {
   closeSheet();
   renderList();
   if (!viewReportEl.hidden) renderReport();
+  if (detailCatId !== null) renderCatDetail();
 }
 
 // ---------- 分類管理 ----------
@@ -789,6 +877,8 @@ $('#import-file').addEventListener('change', (e) => {
   onImportFile(e.target.files[0]);
   e.target.value = '';
 });
+
+$('#detail-back-btn').addEventListener('click', closeCatDetail);
 
 $('#cat-editor-cancel').addEventListener('click', closeCatEditor);
 catEditorBackdropEl.addEventListener('click', closeCatEditor);
