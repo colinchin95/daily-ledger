@@ -222,6 +222,28 @@ const catDeleteBtn = $('#cat-delete-btn');
 const catMap = () => new Map(categories.map((c) => [c.id, c]));
 const catsOfType = (type) => categories.filter((c) => c.type === type);
 
+// 內建分類名稱會跟著介面語言切換;使用者改過名的分類(renamed=true)維持自訂名稱
+const CATEGORY_NAMES = {
+  food:           { zh: '餐飲', en: 'Food' },
+  transport:      { zh: '交通', en: 'Transport' },
+  shopping:       { zh: '購物', en: 'Shopping' },
+  fun:            { zh: '娛樂', en: 'Entertainment' },
+  home:           { zh: '居家', en: 'Home' },
+  medical:        { zh: '醫療', en: 'Medical' },
+  other:          { zh: '其他', en: 'Other' },
+  salary:         { zh: '薪資', en: 'Salary' },
+  bonus:          { zh: '獎金', en: 'Bonus' },
+  investment:     { zh: '投資', en: 'Investment' },
+  'other-income': { zh: '其他收入', en: 'Other Income' },
+};
+
+function catName(cat) {
+  if (!cat) return t('uncategorized');
+  const builtin = CATEGORY_NAMES[cat.id];
+  if (builtin && !cat.renamed) return builtin[lang === 'en' ? 'en' : 'zh'];
+  return cat.name;
+}
+
 function setSegActive(segEl, type) {
   segEl.querySelectorAll('.seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.type === type));
 }
@@ -315,7 +337,7 @@ function renderList() {
       </span>
       <span class="entry-amount"></span>`;
     card.querySelector('.cat-dot').style.background = cat?.color ?? '#8C95A3';
-    card.querySelector('.entry-cat').textContent = cat?.name ?? t('uncategorized');
+    card.querySelector('.entry-cat').textContent = catName(cat);
     if (entry.note) {
       const noteEl = card.querySelector('.entry-note');
       noteEl.textContent = entry.note;
@@ -362,7 +384,7 @@ function renderReport() {
   }
   const rows = [...byCat.entries()]
     .map(([catId, cents]) => ({
-      name: cats.get(catId)?.name ?? t('uncategorized'),
+      name: catName(cats.get(catId)),
       color: cats.get(catId)?.color ?? '#8C95A3',
       cents,
     }))
@@ -418,7 +440,7 @@ function renderCategoryChips() {
     chip.className = 'cat-chip' + (cat.id === selectedCatId ? ' selected' : '');
     chip.innerHTML = `<span class="cat-dot"></span><span></span>`;
     chip.querySelector('.cat-dot').style.background = cat.color;
-    chip.children[1].textContent = cat.name;
+    chip.children[1].textContent = catName(cat);
     chip.addEventListener('click', () => {
       selectedCatId = cat.id;
       renderCategoryChips();
@@ -536,7 +558,7 @@ function renderCatList() {
       <span class="cat-row-count"></span>
       <span class="cat-row-chevron">›</span>`;
     row.querySelector('.cat-dot').style.background = cat.color;
-    row.querySelector('.cat-row-name').textContent = cat.name;
+    row.querySelector('.cat-row-name').textContent = catName(cat);
     row.querySelector('.cat-row-count').textContent = count > 0 ? t('entryCount', count) : '';
     row.addEventListener('click', () => openCatEditor(cat));
     catListEl.appendChild(row);
@@ -580,7 +602,7 @@ function renderColorGrid() {
 function openCatEditor(cat) {
   editingCatId = cat?.id ?? null;
   editorColor = cat?.color ?? PALETTE[Math.floor(PALETTE.length / 2)];
-  catNameInput.value = cat?.name ?? '';
+  catNameInput.value = cat ? catName(cat) : '';
   $('#cat-editor-title').textContent = cat ? t('editCategory') : t('newCategory');
   catDeleteBtn.hidden = !cat;
   renderColorGrid();
@@ -602,7 +624,15 @@ async function onCatSave() {
   if (editingCatId) {
     const cat = categories.find((c) => c.id === editingCatId);
     if (cat) {
-      cat.name = name;
+      const builtin = CATEGORY_NAMES[cat.id];
+      // 名稱仍等於內建預設(任一語言)→ 保持可隨語言切換;否則記為自訂名
+      if (builtin && (name === builtin.zh || name === builtin.en)) {
+        cat.renamed = false;
+        cat.name = builtin.zh;
+      } else {
+        cat.renamed = true;
+        cat.name = name;
+      }
       cat.color = editorColor;
     }
   } else {
