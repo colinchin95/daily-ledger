@@ -97,6 +97,27 @@ const STRINGS = {
     lastBackupToday: '上次備份:今天',
     lastBackupNever: '尚未備份',
     shareTitle: '日常記帳備份',
+    // 雲端同步
+    syncSection: '雲端同步',
+    syncOn: '已開啟',
+    syncOff: '關閉',
+    syncSetup: '雲端同步',
+    syncIntro: '用一組「同步碼」加密同步。換手機或刪 App 重裝時,輸入同一組碼即可還原。資料在裝置上先加密,伺服器看不到內容。',
+    syncCodeLabel: '同步碼',
+    syncGenerate: '產生新的',
+    syncEnable: '啟用同步',
+    syncEnabling: '啟用中…',
+    syncDisable: '停止同步',
+    syncCopy: '複製同步碼',
+    syncCopied: '已複製',
+    syncCodeTooShort: '同步碼至少 8 碼',
+    syncSavedWarn: '請先抄下或複製同步碼再離開——遺失將無法解密還原。',
+    syncedAt: (n) => (n <= 0 ? '剛剛同步' : `${n} 分鐘前同步`),
+    syncedHours: (n) => `${n} 小時前同步`,
+    syncedDays: (n) => `${n} 天前同步`,
+    syncNever: '尚未同步',
+    syncError: '同步失敗,稍後會自動重試。',
+    syncDisableConfirm: '停止同步?資料仍留在這台裝置,但不再上傳/下載。',
     langBtn: 'EN',
   },
   en: {
@@ -193,6 +214,27 @@ const STRINGS = {
     lastBackupToday: 'Last backup: today',
     lastBackupNever: 'Never backed up',
     shareTitle: 'Daily Ledger backup',
+    // Cloud sync
+    syncSection: 'Cloud Sync',
+    syncOn: 'On',
+    syncOff: 'Off',
+    syncSetup: 'Cloud Sync',
+    syncIntro: 'Sync with one "sync code". On a new phone, or after deleting and reinstalling, enter the same code to restore. Data is encrypted on your device — the server never sees it.',
+    syncCodeLabel: 'Sync code',
+    syncGenerate: 'Generate new',
+    syncEnable: 'Enable sync',
+    syncEnabling: 'Enabling…',
+    syncDisable: 'Stop syncing',
+    syncCopy: 'Copy sync code',
+    syncCopied: 'Copied',
+    syncCodeTooShort: 'Sync code must be at least 8 characters',
+    syncSavedWarn: 'Copy or write down your sync code first — if lost, the data cannot be decrypted.',
+    syncedAt: (n) => (n <= 0 ? 'Synced just now' : `Synced ${n} min ago`),
+    syncedHours: (n) => `Synced ${n}h ago`,
+    syncedDays: (n) => `Synced ${n}d ago`,
+    syncNever: 'Not synced yet',
+    syncError: 'Sync failed — will retry automatically.',
+    syncDisableConfirm: 'Stop syncing? Data stays on this device but no longer uploads/downloads.',
     langBtn: '中文',
   },
 };
@@ -200,7 +242,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v7';
+const APP_VERSION = 'v8';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -396,6 +438,13 @@ const recurDeleteBtn = $('#recur-delete-btn');
 
 // PIN 鎖
 const lockScreenEl = $('#lock-screen');
+
+// 雲端同步
+const syncRowEl = $('#sync-row');
+const syncStatusEl = $('#sync-status');
+const syncSheetEl = $('#sync-sheet');
+const syncSheetBackdropEl = $('#sync-sheet-backdrop');
+const syncCodeInput = $('#sync-code-input');
 
 const catMap = () => new Map(categories.map((c) => [c.id, c]));
 const catsOfType = (type) => categories.filter((c) => c.type === type);
@@ -909,6 +958,7 @@ async function onSave() {
   }
 
   await saveEntries(entries);
+  schedulePush();
   closeSheet();
   renderList();
   if (!viewReportEl.hidden) renderReport();
@@ -920,6 +970,7 @@ async function onDelete() {
   if (!confirm(t('confirmDeleteEntry'))) return;
   entries = entries.filter((e) => e.id !== editingId);
   await saveEntries(entries);
+  schedulePush();
   closeSheet();
   renderList();
   if (!viewReportEl.hidden) renderReport();
@@ -963,6 +1014,7 @@ function openCatModal() {
   renderRecurList();
   renderLockStatus();
   updateBackupStatus();
+  updateSyncStatus();
   catModalEl.classList.add('open');
 }
 
@@ -1035,6 +1087,7 @@ async function onCatSave() {
     categories.push(cat);
   }
   await saveCategories(categories);
+  schedulePush();
   closeCatEditor();
   renderCatList();
   renderList();
@@ -1048,6 +1101,7 @@ async function onCatDelete() {
   if (!confirm(msg)) return;
   categories = categories.filter((c) => c.id !== editingCatId);
   await saveCategories(categories);
+  schedulePush();
   closeCatEditor();
   renderCatList();
   renderList();
@@ -1059,6 +1113,7 @@ async function onBudgetChange() {
   const cents = parseMoney(budgetInput.value);
   meta = { ...meta, monthlyBudgetCents: cents };
   await saveMeta(meta);
+  schedulePush();
   budgetInput.value = cents ? centsToInputStr(cents) : '';
   if (!viewReportEl.hidden) renderReport();
 }
@@ -1087,7 +1142,10 @@ async function materializeRecurring() {
     r.lastRun = mKey;
     added++;
   }
-  if (added) await Promise.all([saveEntries(entries), saveRecurring(recurring)]);
+  if (added) {
+    await Promise.all([saveEntries(entries), saveRecurring(recurring)]);
+    if (syncEnabled()) localStorage.setItem('syncDirty', '1'); // 啟動時的 initSync 會推上去
+  }
   return added;
 }
 
@@ -1192,6 +1250,7 @@ async function onRecurSave() {
     recurring.push({ id: crypto.randomUUID(), lastRun: '', ...data });
   }
   await saveRecurring(recurring);
+  schedulePush();
   // 立即補當月(若已到指定日)
   const added = await materializeRecurring();
   closeRecurEditor();
@@ -1204,6 +1263,7 @@ async function onRecurDelete() {
   if (!editingRecurId) return;
   recurring = recurring.filter((x) => x.id !== editingRecurId);
   await saveRecurring(recurring);
+  schedulePush();
   closeRecurEditor();
   renderRecurList();
 }
@@ -1401,6 +1461,7 @@ async function onImportFile(file) {
   }
 
   await Promise.all([saveEntries(entries), saveCategories(categories), saveMeta(meta), saveRecurring(recurring)]);
+  schedulePush();
   renderList();
   renderReport();
   renderCatList();
@@ -1555,6 +1616,266 @@ function onLockRowClick() {
   }
 }
 
+// ---------- 雲端同步(端到端加密) ----------
+const SYNC_ENDPOINT = 'https://daily-ledger-sync.yuxuanchin95.workers.dev/v1/';
+const SYNC_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // 去掉易混淆字元
+
+let syncCode = localStorage.getItem('syncCode') || null;
+let syncKey = null;     // CryptoKey(只在記憶體)
+let syncId = null;      // 雲端查詢鍵(同步碼的雜湊)
+let syncVersion = Number(localStorage.getItem('syncVersion')) || 0;
+let syncBusy = false;
+let syncPushTimer = null;
+
+const syncEnabled = () => !!syncCode;
+
+function bufToB64(buf) {
+  const bytes = new Uint8Array(buf);
+  let s = '';
+  for (let i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+  return btoa(s);
+}
+function b64ToBuf(b64) {
+  const s = atob(b64);
+  const bytes = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+  return bytes.buffer;
+}
+function hexOf(buf) {
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// 由同步碼推導:AES-GCM 金鑰(PBKDF2)+ 雲端 id(SHA-256)
+async function deriveSync(code) {
+  const enc = new TextEncoder();
+  const baseKey = await crypto.subtle.importKey('raw', enc.encode(code), 'PBKDF2', false, ['deriveKey']);
+  syncKey = await crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt: enc.encode('dl-enc-v1'), iterations: 150000, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+  syncId = hexOf(await crypto.subtle.digest('SHA-256', enc.encode(code + 'dl-id-v1')));
+}
+
+function generateSyncCode() {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let out = '';
+  for (let i = 0; i < bytes.length; i++) {
+    out += SYNC_ALPHABET[bytes[i] % SYNC_ALPHABET.length];
+    if (i % 4 === 3 && i < bytes.length - 1) out += '-';
+  }
+  return out; // 例如 ABCD-EFGH-JKLM-NPQR
+}
+
+async function encryptPayload() {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const data = new TextEncoder().encode(JSON.stringify({ categories, entries, meta, recurring }));
+  const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, syncKey, data);
+  return { iv: bufToB64(iv.buffer), ciphertext: bufToB64(ct) };
+}
+async function decryptPayload(ivB64, ctB64) {
+  const iv = new Uint8Array(b64ToBuf(ivB64));
+  const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, syncKey, b64ToBuf(ctB64));
+  return JSON.parse(new TextDecoder().decode(pt));
+}
+
+// 把遠端資料合併進本機(以 id 聯集,遠端優先;不弄丟資料)
+function mergeRemote(data) {
+  const inEntries = Array.isArray(data.entries) ? data.entries.map(sanitizeEntry).filter(Boolean) : [];
+  const inCats = Array.isArray(data.categories) ? data.categories.map(sanitizeCategory).filter(Boolean) : [];
+  const inRecur = Array.isArray(data.recurring) ? data.recurring.map(sanitizeRecurring).filter(Boolean) : [];
+
+  const em = new Map(entries.map((x) => [x.id, x]));
+  for (const x of inEntries) em.set(x.id, x);
+  entries = [...em.values()];
+
+  const cm = new Map(categories.map((x) => [x.id, x]));
+  for (const x of inCats) cm.set(x.id, x);
+  categories = [...cm.values()];
+
+  const rm = new Map(recurring.map((x) => [x.id, x]));
+  for (const x of inRecur) rm.set(x.id, x);
+  recurring = [...rm.values()];
+
+  if (data.meta && typeof data.meta === 'object') {
+    const b = Math.round(Number(data.meta.monthlyBudgetCents));
+    if (Number.isFinite(b) && b > 0) meta = { ...meta, monthlyBudgetCents: b };
+  }
+}
+
+async function persistAll() {
+  await Promise.all([saveEntries(entries), saveCategories(categories), saveMeta(meta), saveRecurring(recurring)]);
+}
+
+function setSyncVersion(v) {
+  syncVersion = v;
+  localStorage.setItem('syncVersion', String(v));
+}
+
+function refreshAfterSync() {
+  renderList();
+  if (!viewReportEl.hidden) renderReport();
+  renderCatList();
+  if (detailCatId !== null) renderCatDetail();
+}
+
+async function pullSync() {
+  const res = await fetch(SYNC_ENDPOINT + syncId);
+  if (!res.ok) throw new Error('pull failed');
+  const data = await res.json();
+  if (data.iv && data.ciphertext && data.version > syncVersion) {
+    const remote = await decryptPayload(data.iv, data.ciphertext);
+    mergeRemote(remote);
+    await persistAll();
+    setSyncVersion(data.version);
+    refreshAfterSync();
+  }
+}
+
+async function pushSync(retry = true) {
+  const enc = await encryptPayload();
+  const res = await fetch(SYNC_ENDPOINT + syncId, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ baseVersion: syncVersion, iv: enc.iv, ciphertext: enc.ciphertext }),
+  });
+  if (res.status === 409) {
+    const remote = await res.json();
+    if (remote.iv && remote.ciphertext) {
+      mergeRemote(await decryptPayload(remote.iv, remote.ciphertext));
+      await persistAll();
+      refreshAfterSync();
+    }
+    setSyncVersion(remote.version || 0);
+    if (retry) return pushSync(false); // 合併遠端後重推一次
+    throw new Error('conflict');
+  }
+  if (!res.ok) throw new Error('push failed');
+  const out = await res.json();
+  setSyncVersion(out.version);
+  localStorage.setItem('syncAt', String(Date.now()));
+  localStorage.removeItem('syncDirty');
+  updateSyncStatus();
+}
+
+// 開 App / 回前景:先拉再(必要時)推
+async function syncNow() {
+  if (!syncEnabled() || !syncKey || syncBusy) return;
+  syncBusy = true;
+  try {
+    await pullSync();
+    if (localStorage.getItem('syncDirty')) await pushSync();
+  } catch {
+    /* 網路/衝突失敗:保留 dirty,稍後再試 */
+  } finally {
+    syncBusy = false;
+    updateSyncStatus();
+  }
+}
+
+// 任何資料變動後呼叫:標記待同步並排程上傳
+function schedulePush() {
+  if (!syncEnabled()) return;
+  localStorage.setItem('syncDirty', '1');
+  updateSyncStatus();
+  clearTimeout(syncPushTimer);
+  syncPushTimer = setTimeout(doPush, 2500);
+}
+
+async function doPush() {
+  if (!syncEnabled() || !syncKey || syncBusy) {
+    syncPushTimer = setTimeout(doPush, 2500); // 還沒就緒,稍後再試
+    return;
+  }
+  syncBusy = true;
+  try {
+    await pushSync();
+  } catch {
+    /* 失敗保留 dirty */
+  } finally {
+    syncBusy = false;
+    updateSyncStatus();
+  }
+}
+
+async function enableSync(code) {
+  syncCode = code;
+  localStorage.setItem('syncCode', code);
+  setSyncVersion(0);
+  await deriveSync(code);
+  try {
+    await pullSync();                          // 雲端若已有此碼資料 → 合併還原
+    localStorage.setItem('syncDirty', '1');    // 確保把本機(合併後)推上去
+    await pushSync();
+  } catch {
+    /* 失敗:仍保持啟用,dirty 會在下次重試 */
+  }
+  updateSyncStatus();
+}
+
+function disableSync() {
+  syncCode = null;
+  syncKey = null;
+  syncId = null;
+  syncVersion = 0;
+  ['syncCode', 'syncVersion', 'syncAt', 'syncDirty'].forEach((k) => localStorage.removeItem(k));
+  updateSyncStatus();
+}
+
+async function initSync() {
+  if (!syncCode) return;
+  await deriveSync(syncCode);
+  await syncNow();
+}
+
+function updateSyncStatus() {
+  if (!syncStatusEl) return;
+  if (!syncEnabled()) { syncStatusEl.textContent = t('syncOff'); return; }
+  const at = Number(localStorage.getItem('syncAt'));
+  if (!at) { syncStatusEl.textContent = t('syncOn'); return; }
+  const mins = Math.floor((Date.now() - at) / 60000);
+  if (mins < 60) syncStatusEl.textContent = t('syncedAt', mins);
+  else if (mins < 1440) syncStatusEl.textContent = t('syncedHours', Math.floor(mins / 60));
+  else syncStatusEl.textContent = t('syncedDays', Math.floor(mins / 1440));
+}
+
+// ---------- 同步設定面板 ----------
+function openSyncSheet() {
+  const on = syncEnabled();
+  syncCodeInput.value = on ? syncCode : generateSyncCode();
+  syncCodeInput.readOnly = on;
+  $('#sync-generate').hidden = on;
+  $('#sync-enable').hidden = on;
+  $('#sync-copy').hidden = !on;
+  $('#sync-disable').hidden = !on;
+  $('#sync-warn').hidden = on;
+  $('#sync-enable').disabled = false;
+  $('#sync-enable').textContent = t('syncEnable');
+  syncSheetEl.classList.add('open');
+  syncSheetBackdropEl.classList.add('open');
+}
+function closeSyncSheet() {
+  syncSheetEl.classList.remove('open');
+  syncSheetBackdropEl.classList.remove('open');
+}
+
+async function onSyncEnable() {
+  const code = syncCodeInput.value.trim().toUpperCase();
+  if (code.replace(/[^A-Z0-9]/g, '').length < 8) {
+    alert(t('syncCodeTooShort'));
+    return;
+  }
+  const btn = $('#sync-enable');
+  btn.disabled = true;
+  btn.textContent = t('syncEnabling');
+  await enableSync(code);
+  closeSyncSheet();
+  renderRecurList();
+}
+
 // ---------- 事件繫結 ----------
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
 
@@ -1639,6 +1960,23 @@ recurTypeSegEl.querySelectorAll('.seg-btn').forEach((btn) =>
   btn.addEventListener('click', () => setRecurType(btn.dataset.type))
 );
 
+// 雲端同步
+syncRowEl.addEventListener('click', openSyncSheet);
+$('#sync-cancel').addEventListener('click', closeSyncSheet);
+syncSheetBackdropEl.addEventListener('click', closeSyncSheet);
+$('#sync-generate').addEventListener('click', () => { syncCodeInput.value = generateSyncCode(); });
+$('#sync-enable').addEventListener('click', onSyncEnable);
+$('#sync-copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(syncCode); } catch {}
+  const b = $('#sync-copy');
+  b.textContent = t('syncCopied');
+  setTimeout(() => { b.textContent = t('syncCopy'); }, 1500);
+});
+$('#sync-disable').addEventListener('click', () => {
+  if (confirm(t('syncDisableConfirm'))) { disableSync(); closeSyncSheet(); }
+});
+document.addEventListener('visibilitychange', () => { if (!document.hidden) syncNow(); });
+
 // App 鎖
 lockRowEl.addEventListener('click', onLockRowClick);
 lockScreenEl.querySelectorAll('.lock-key').forEach((btn) =>
@@ -1673,6 +2011,8 @@ async function init() {
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
+
+  initSync();   // 若已設定同步碼:拉回雲端最新並推送本機變動
 }
 
 init();

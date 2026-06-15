@@ -184,6 +184,16 @@
     <p class="backup-hint" id="backup-status"></p>
     <input type="file" id="import-file" accept=".json,application/json" hidden>
 
+    <div class="section-label" data-i18n="syncSection">雲端同步</div>
+    <div class="cat-list">
+      <button id="sync-row" class="cat-row" type="button">
+        <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 16m0 4v-4h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="cat-row-name" data-i18n="syncSetup">雲端同步</span>
+        <span id="sync-status" class="cat-row-count"></span>
+        <span class="cat-row-chevron">›</span>
+      </button>
+    </div>
+
     <div class="section-label" data-i18n="lockSection">App 鎖</div>
     <div class="cat-list">
       <button id="lock-row" class="cat-row" type="button">
@@ -250,6 +260,27 @@
       </label>
     </div>
     <button id="recur-delete-btn" class="cat-delete-btn" type="button" data-i18n="delete" hidden>刪除</button>
+  </section>
+
+  <!-- 雲端同步設定 -->
+  <div id="sync-sheet-backdrop" class="backdrop editor-backdrop"></div>
+  <section id="sync-sheet" class="sheet cat-editor">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="sync-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
+      <span class="sheet-title" data-i18n="syncSetup">雲端同步</span>
+      <span style="min-width:52px"></span>
+    </div>
+    <p class="sync-intro" data-i18n="syncIntro"></p>
+    <div class="sync-code-label" data-i18n="syncCodeLabel">同步碼</div>
+    <div class="sync-code-field">
+      <input id="sync-code-input" class="field-input" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
+      <button id="sync-generate" class="sync-inline-btn" type="button" data-i18n="syncGenerate">產生新的</button>
+    </div>
+    <p class="sync-warn" id="sync-warn" data-i18n="syncSavedWarn"></p>
+    <button id="sync-enable" class="save-btn" type="button" data-i18n="syncEnable">啟用同步</button>
+    <button id="sync-copy" class="cat-delete-btn sync-secondary" type="button" data-i18n="syncCopy" hidden>複製同步碼</button>
+    <button id="sync-disable" class="cat-delete-btn" type="button" data-i18n="syncDisable" hidden>停止同步</button>
   </section>
 
   <!-- 分類明細(點報表分類進入) -->
