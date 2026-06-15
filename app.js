@@ -87,6 +87,16 @@ const STRINGS = {
     pinMismatch: '兩次輸入不一致,請重試',
     wrongPin: 'PIN 碼錯誤',
     confirmRemovePin: '確定要移除 PIN 碼嗎?',
+    // 備份安全網
+    exportCsv: '匯出 CSV(試算表)',
+    backupReminderDays: (n) => `已 ${n} 天沒備份了,建議現在備份一次。`,
+    backupReminderNever: '你的帳目只在這台裝置上,建議現在備份一次。',
+    backupNow: '立即備份',
+    later: '稍後',
+    lastBackup: (n) => `上次備份:${n} 天前`,
+    lastBackupToday: '上次備份:今天',
+    lastBackupNever: '尚未備份',
+    shareTitle: '日常記帳備份',
     langBtn: 'EN',
   },
   en: {
@@ -173,6 +183,16 @@ const STRINGS = {
     pinMismatch: 'Passcodes do not match, try again',
     wrongPin: 'Wrong passcode',
     confirmRemovePin: 'Remove the passcode?',
+    // Backup safety net
+    exportCsv: 'Export CSV (spreadsheet)',
+    backupReminderDays: (n) => `It's been ${n} days since your last backup — back up now.`,
+    backupReminderNever: 'Your data lives only on this device — back it up now.',
+    backupNow: 'Back up now',
+    later: 'Later',
+    lastBackup: (n) => `Last backup: ${n} day${n === 1 ? '' : 's'} ago`,
+    lastBackupToday: 'Last backup: today',
+    lastBackupNever: 'Never backed up',
+    shareTitle: 'Daily Ledger backup',
     langBtn: '中文',
   },
 };
@@ -180,7 +200,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v6';
+const APP_VERSION = 'v7';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -345,6 +365,10 @@ let detailCatId = null;   // 目前開啟的分類明細(null = 未開啟)
 // 搜尋
 const searchInput = $('#search-input');
 const searchClearBtn = $('#search-clear');
+
+// 備份安全網
+const backupBannerEl = $('#backup-banner');
+const backupStatusEl = $('#backup-status');
 
 // 報表:預算卡 + 趨勢卡
 const budgetCardEl = $('#budget-card');
@@ -938,6 +962,7 @@ function openCatModal() {
   budgetInput.value = meta.monthlyBudgetCents ? centsToInputStr(meta.monthlyBudgetCents) : '';
   renderRecurList();
   renderLockStatus();
+  updateBackupStatus();
   catModalEl.classList.add('open');
 }
 
@@ -1184,7 +1209,44 @@ async function onRecurDelete() {
 }
 
 // ---------- 資料備份:JSON 匯出 / 匯入 ----------
-function exportBackup() {
+const DAY_MS = 86400000;
+const REMIND_DAYS = 14;
+
+function daysSince(ts) {
+  return Math.floor((Date.now() - ts) / DAY_MS);
+}
+
+// 優先用系統分享面板(iOS 可存到「檔案」/iCloud),不支援才退回下載
+async function shareOrDownload(filename, text, mime) {
+  try {
+    const file = new File([text], filename, { type: mime });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: t('shareTitle') });
+      return true;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return false; // 使用者取消,不算完成
+    // 其他錯誤 → 退回下載
+  }
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  return true;
+}
+
+function markBackup() {
+  localStorage.setItem('lastBackupAt', String(Date.now()));
+  hideBackupBanner();
+  updateBackupStatus();
+}
+
+async function exportBackup() {
   const payload = {
     app: 'daily-ledger',
     version: 2,
@@ -1194,15 +1256,60 @@ function exportBackup() {
     meta,
     recurring,
   };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `daily-ledger-backup-${todayStr()}.json`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const ok = await shareOrDownload(
+    `daily-ledger-backup-${todayStr()}.json`,
+    JSON.stringify(payload, null, 2),
+    'application/json'
+  );
+  if (ok) markBackup();   // 只有真的存出 JSON(可還原)才更新備份時間
+}
+
+function csvCell(v) {
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+async function exportCsv() {
+  const cats = catMap();
+  const header = ['date', 'type', 'category', 'note', 'amount'];
+  const lines = [...entries]
+    .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
+    .map((e) =>
+      [e.date, e.type, catName(cats.get(e.categoryId)), e.note || '', (e.amountCents / 100).toFixed(2)]
+        .map(csvCell)
+        .join(',')
+    );
+  // 加 BOM 讓 Excel 正確辨識 UTF-8
+  const csv = '﻿' + [header.join(','), ...lines].join('\n');
+  await shareOrDownload(`daily-ledger-${todayStr()}.csv`, csv, 'text/csv');
+}
+
+// 設定頁:上次備份狀態
+function updateBackupStatus() {
+  const ts = Number(localStorage.getItem('lastBackupAt'));
+  if (!ts) { backupStatusEl.textContent = t('lastBackupNever'); return; }
+  const d = daysSince(ts);
+  backupStatusEl.textContent = d <= 0 ? t('lastBackupToday') : t('lastBackup', d);
+}
+
+// 開 App 時的備份提醒橫幅
+function maybeShowBackupBanner() {
+  if (entries.length < 5) return;                              // 帳目太少不打擾
+  if (Date.now() < (Number(localStorage.getItem('backupSnoozeUntil')) || 0)) return;
+  const ts = Number(localStorage.getItem('lastBackupAt'));
+  if (ts && daysSince(ts) < REMIND_DAYS) return;
+  backupBannerEl.querySelector('.backup-banner-text').textContent =
+    ts ? t('backupReminderDays', daysSince(ts)) : t('backupReminderNever');
+  backupBannerEl.hidden = false;
+}
+
+function hideBackupBanner() {
+  backupBannerEl.hidden = true;
+}
+
+function snoozeBackupBanner() {
+  localStorage.setItem('backupSnoozeUntil', String(Date.now() + 3 * DAY_MS));
+  hideBackupBanner();
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1494,7 +1601,12 @@ catSegEl.querySelectorAll('.seg-btn').forEach((btn) =>
   })
 );
 $('#export-btn').addEventListener('click', exportBackup);
+$('#export-csv-btn').addEventListener('click', exportCsv);
 $('#import-btn').addEventListener('click', () => $('#import-file').click());
+
+// 備份提醒橫幅
+$('#backup-banner-now').addEventListener('click', exportBackup);
+$('#backup-banner-later').addEventListener('click', snoozeBackupBanner);
 $('#import-file').addEventListener('change', (e) => {
   onImportFile(e.target.files[0]);
   e.target.value = '';
@@ -1555,6 +1667,7 @@ async function init() {
   ]);
   await materializeRecurring();   // 補當月固定支出
   renderList();
+  maybeShowBackupBanner();        // 太久沒備份就提醒
 
   // PWA:註冊 service worker(需要 https 或 localhost)
   if ('serviceWorker' in navigator) {

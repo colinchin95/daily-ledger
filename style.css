@@ -792,6 +792,37 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   padding: 0;
 }
 
+/* ---------- 備份提醒橫幅 ---------- */
+.backup-banner {
+  background: rgba(217, 182, 77, 0.10);
+  border: 1px solid rgba(217, 182, 77, 0.28);
+  border-radius: 14px;
+  padding: 13px 14px;
+  margin-bottom: 14px;
+}
+
+.backup-banner-row { display: flex; align-items: center; gap: 10px; }
+.backup-banner-row svg { width: 20px; height: 20px; color: var(--gold); flex: none; }
+.backup-banner-text { font-size: 14px; line-height: 1.4; color: var(--text); }
+
+.backup-banner-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 11px; }
+
+.backup-banner-btn {
+  border: none;
+  border-radius: 9px;
+  padding: 7px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.backup-banner-later { background: var(--surface-2); color: var(--text-2); }
+.backup-banner-now {
+  background: linear-gradient(170deg, var(--gold-bright), var(--gold));
+  color: #1d1605;
+}
+.backup-banner-btn:active { opacity: 0.7; }
+
 /* ---------- 預算 ---------- */
 .budget-card { padding: 16px 18px; }
 
