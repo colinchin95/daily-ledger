@@ -118,6 +118,10 @@ const STRINGS = {
     syncNever: '尚未同步',
     syncError: '同步失敗,稍後會自動重試。',
     syncDisableConfirm: '停止同步?資料仍留在這台裝置,但不再上傳/下載。',
+    // 收據辨識
+    scanReceipt: '掃描收據',
+    scanningReceipt: '辨識中…',
+    receiptFailed: '收據辨識失敗,請改用手動輸入。',
     langBtn: 'EN',
   },
   en: {
@@ -235,6 +239,10 @@ const STRINGS = {
     syncNever: 'Not synced yet',
     syncError: 'Sync failed — will retry automatically.',
     syncDisableConfirm: 'Stop syncing? Data stays on this device but no longer uploads/downloads.',
+    // Receipt scanning
+    scanReceipt: 'Scan receipt',
+    scanningReceipt: 'Scanning…',
+    receiptFailed: "Couldn't read the receipt — please enter manually.",
     langBtn: '中文',
   },
 };
@@ -242,7 +250,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v8';
+const APP_VERSION = 'v9';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1876,8 +1884,84 @@ async function onSyncEnable() {
   renderRecurList();
 }
 
+// ---------- 收據辨識(Claude vision) ----------
+const RECEIPT_ENDPOINT = 'https://daily-ledger-sync.yuxuanchin95.workers.dev/receipt';
+
+// 縮圖 + 轉 JPEG base64,壓低上傳量
+async function fileToBase64(file, maxDim = 1280, quality = 0.7) {
+  const dataUrl = await new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+  const img = await new Promise((res, rej) => {
+    const im = new Image();
+    im.onload = () => res(im);
+    im.onerror = rej;
+    im.src = dataUrl;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  const w = Math.round(img.width * scale);
+  const h = Math.round(img.height * scale);
+  const cv = document.createElement('canvas');
+  cv.width = w;
+  cv.height = h;
+  cv.getContext('2d').drawImage(img, 0, 0, w, h);
+  return cv.toDataURL('image/jpeg', quality).split(',')[1];
+}
+
+async function onReceiptFile(file) {
+  if (!file) return;
+  const btn = $('#receipt-btn');
+  const label = btn.querySelector('.receipt-label');
+  const original = label.textContent;
+  btn.disabled = true;
+  btn.classList.add('busy');
+  label.textContent = t('scanningReceipt');
+  try {
+    const image = await fileToBase64(file);
+    const names = catsOfType('expense').map((c) => catName(c));
+    const res = await fetch(RECEIPT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, mediaType: 'image/jpeg', categories: names }),
+    });
+    if (!res.ok) throw new Error('receipt failed');
+    const r = await res.json();
+
+    setSheetType('expense'); // 收據一律當支出
+    if (typeof r.amount === 'number' && r.amount > 0) {
+      amountStr = String(Math.round(r.amount * 100) / 100);
+      renderAmount();
+    }
+    if (r.merchant) noteInput.value = String(r.merchant).slice(0, 60);
+    if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) dateInput.value = r.date;
+    if (r.category) {
+      const match = catsOfType('expense').find(
+        (c) => catName(c).toLowerCase() === String(r.category).toLowerCase()
+      );
+      if (match) selectedCatId = match.id;
+    }
+    renderCategoryChips();
+    updateSaveState();
+  } catch {
+    alert(t('receiptFailed'));
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('busy');
+    label.textContent = original;
+  }
+}
+
 // ---------- 事件繫結 ----------
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
+
+$('#receipt-btn').addEventListener('click', () => $('#receipt-input').click());
+$('#receipt-input').addEventListener('change', (e) => {
+  onReceiptFile(e.target.files[0]);
+  e.target.value = '';
+});
 
 tabListBtn.addEventListener('click', () => switchView('list'));
 tabReportBtn.addEventListener('click', () => switchView('report'));

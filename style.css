@@ -504,6 +504,34 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   background: rgba(217, 182, 77, 0.12);
 }
 
+/* 掃描收據 */
+.receipt-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 11px;
+  margin-bottom: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--gold);
+  background: rgba(217, 182, 77, 0.10);
+  border: 1px solid rgba(217, 182, 77, 0.30);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.receipt-btn svg { width: 20px; height: 20px; }
+.receipt-btn:active { background: rgba(217, 182, 77, 0.18); }
+.receipt-btn:disabled { opacity: 0.6; cursor: default; }
+.receipt-btn.busy svg { animation: receipt-pulse 1s ease-in-out infinite; }
+
+@keyframes receipt-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
 /* 備註 / 日期 */
 .field-row { display: flex; gap: 8px; margin-bottom: 12px; }
 
