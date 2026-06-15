@@ -6,7 +6,7 @@ import {
 // ---------- 多語系 ----------
 const STRINGS = {
   zh: {
-    appTitle: '日常記帳',
+    appTitle: 'Centsei',
     categories: '分類',
     done: '完成',
     cancel: '取消',
@@ -96,7 +96,7 @@ const STRINGS = {
     lastBackup: (n) => `上次備份:${n} 天前`,
     lastBackupToday: '上次備份:今天',
     lastBackupNever: '尚未備份',
-    shareTitle: '日常記帳備份',
+    shareTitle: 'Centsei 備份',
     // 雲端同步
     syncSection: '雲端同步',
     syncOn: '已開啟',
@@ -125,7 +125,7 @@ const STRINGS = {
     langBtn: 'EN',
   },
   en: {
-    appTitle: 'Daily Ledger',
+    appTitle: 'Centsei',
     categories: 'Categories',
     done: 'Done',
     cancel: 'Cancel',
@@ -217,7 +217,7 @@ const STRINGS = {
     lastBackup: (n) => `Last backup: ${n} day${n === 1 ? '' : 's'} ago`,
     lastBackupToday: 'Last backup: today',
     lastBackupNever: 'Never backed up',
-    shareTitle: 'Daily Ledger backup',
+    shareTitle: 'Centsei backup',
     // Cloud sync
     syncSection: 'Cloud Sync',
     syncOn: 'On',
@@ -250,7 +250,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v9';
+const APP_VERSION = 'v10';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1325,7 +1325,7 @@ async function exportBackup() {
     recurring,
   };
   const ok = await shareOrDownload(
-    `daily-ledger-backup-${todayStr()}.json`,
+    `centsei-backup-${todayStr()}.json`,
     JSON.stringify(payload, null, 2),
     'application/json'
   );
@@ -1349,7 +1349,7 @@ async function exportCsv() {
     );
   // 加 BOM 讓 Excel 正確辨識 UTF-8
   const csv = '﻿' + [header.join(','), ...lines].join('\n');
-  await shareOrDownload(`daily-ledger-${todayStr()}.csv`, csv, 'text/csv');
+  await shareOrDownload(`centsei-${todayStr()}.csv`, csv, 'text/csv');
 }
 
 // 設定頁:上次備份狀態
