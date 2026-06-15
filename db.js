@@ -4,6 +4,8 @@ import { get, set } from './lib/idb-keyval.js';
 
 const KEY_ENTRIES = 'entries';
 const KEY_CATEGORIES = 'categories';
+const KEY_META = 'meta';
+const KEY_RECURRING = 'recurring';
 
 const DEFAULT_EXPENSE_CATEGORIES = [
   { id: 'food',      name: '餐飲', color: '#E8A33D', type: 'expense' },
@@ -59,4 +61,22 @@ export async function getEntries() {
 
 export async function saveEntries(entries) {
   await set(KEY_ENTRIES, entries);
+}
+
+// meta:整月預算等設定(會包含在備份中)
+export async function getMeta() {
+  return (await get(KEY_META)) ?? {};
+}
+
+export async function saveMeta(meta) {
+  await set(KEY_META, meta);
+}
+
+// recurring:固定/循環支出範本
+export async function getRecurring() {
+  return (await get(KEY_RECURRING)) ?? [];
+}
+
+export async function saveRecurring(list) {
+  await set(KEY_RECURRING, list);
 }

@@ -1,6 +1,6 @@
 // Service Worker:App 殼層快取,離線也能開
 // 改版時把 VERSION +1,舊快取會在 activate 時清掉
-const VERSION = 'daily-ledger-v5';
+const VERSION = 'daily-ledger-v6';
 
 const SHELL = [
   './',

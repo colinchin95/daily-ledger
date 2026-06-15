@@ -751,4 +751,239 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 
 .cat-delete-btn:active { background: var(--surface-3); }
 
+/* ---------- 搜尋列 ---------- */
+.search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border-radius: 11px;
+  padding: 9px 12px;
+  margin-bottom: 14px;
+}
+
+.search-icon { width: 18px; height: 18px; flex: none; color: var(--text-3); }
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--text);
+}
+.search-input::placeholder { color: var(--text-3); }
+.search-input::-webkit-search-cancel-button { display: none; }
+
+.search-clear {
+  flex: none;
+  border: none;
+  background: var(--surface-3);
+  color: var(--text-2);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 20px;
+  text-align: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* ---------- 預算 ---------- */
+.budget-card { padding: 16px 18px; }
+
+.budget-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 9px;
+}
+.budget-label { font-size: 14px; color: var(--text-2); }
+.budget-vs { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.budget-bar-track {
+  height: 7px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+.budget-bar { height: 100%; border-radius: 4px; transition: width 0.5s var(--spring); }
+.budget-foot { margin-top: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+
+.over-tag {
+  flex: none;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--red);
+  background: rgba(255, 105, 97, 0.16);
+  padding: 1px 7px;
+  border-radius: 6px;
+}
+
+.detail-budget {
+  margin: 14px 4px 2px;
+  padding-top: 14px;
+  border-top: 0.5px solid var(--separator);
+  text-align: left;
+}
+
+/* 編輯器內的金額/預算輸入 */
+.budget-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface-2);
+  border-radius: 11px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+}
+.budget-field-prefix { color: var(--text-2); font-size: 15px; font-weight: 600; flex: none; }
+.budget-field .field-input { background: none; border-radius: 0; padding-left: 0; padding-right: 0; }
+
+/* 設定:整月預算行 */
+.budget-row { display: flex; align-items: center; gap: 10px; }
+.budget-inline-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 16px;
+  color: var(--text);
+  text-align: right;
+}
+
+/* ---------- 趨勢圖 ---------- */
+.trend-card { padding: 16px 16px 12px; }
+.trend-title { font-size: 13px; color: var(--text-2); margin-bottom: 14px; }
+
+.trend-chart {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+  height: 130px;
+}
+
+.trend-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  height: 100%;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+
+.trend-val { font-size: 10px; color: var(--text-3); font-variant-numeric: tabular-nums; min-height: 13px; }
+.trend-col.current .trend-val { color: var(--gold); font-weight: 600; }
+
+.trend-bar-wrap {
+  flex: 1;
+  width: 60%;
+  max-width: 26px;
+  display: flex;
+  align-items: flex-end;
+}
+.trend-bar {
+  width: 100%;
+  background: var(--surface-3);
+  border-radius: 4px 4px 2px 2px;
+  transition: height 0.5s var(--spring);
+}
+.trend-col.current .trend-bar {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+}
+
+.trend-month { font-size: 11px; color: var(--text-3); }
+.trend-col.current .trend-month { color: var(--text); font-weight: 600; }
+
+/* ---------- 固定支出 ---------- */
+.recur-row { gap: 12px; }
+.recur-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.recur-name { font-size: 16px; }
+.recur-sub { font-size: 12px; color: var(--text-2); }
+.recur-amount { flex: none; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.recur-seg { width: 100%; margin-bottom: 14px; }
+.recur-seg .seg-btn { flex: 1; }
+
+.day-field {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface-2);
+  border-radius: 11px;
+  padding: 0 14px;
+}
+.day-prefix { font-size: 14px; color: var(--text-2); white-space: nowrap; }
+.day-input {
+  width: 54px;
+  background: none;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: right;
+  color-scheme: dark;
+}
+
+/* ---------- PIN 鎖屏 ---------- */
+.lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lock-inner {
+  width: min(330px, 86%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.lock-glyph { width: 40px; height: 40px; color: var(--gold); margin-bottom: 18px; }
+.lock-title { font-size: 17px; color: var(--text); margin-bottom: 22px; }
+
+.lock-dots { display: flex; gap: 16px; margin-bottom: 14px; min-height: 14px; }
+.lock-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 1.5px solid var(--text-3);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.lock-dot.filled { background: var(--gold); border-color: var(--gold); }
+.lock-dot.error { border-color: var(--red); background: var(--red); }
+
+.lock-error { color: var(--red); font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+
+.lock-keypad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  width: 100%;
+}
+.lock-keypad .lock-key {
+  aspect-ratio: 1.4;
+  min-height: 0;
+  font-size: 26px;
+  background: var(--surface-2);
+}
+.lock-keypad .key-del { color: var(--gold); font-size: 22px; }
+
+.lock-done { margin-top: 18px; }
+
 [hidden] { display: none !important; }

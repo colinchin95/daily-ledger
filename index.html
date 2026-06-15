@@ -25,6 +25,11 @@
 
   <!-- 明細 -->
   <main id="view-list" class="view">
+    <div class="search-bar">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input id="search-input" class="search-input" type="search" data-i18n-ph="searchPlaceholder" placeholder="搜尋備註、分類或金額" autocomplete="off">
+      <button id="search-clear" class="search-clear" type="button" aria-label="clear" hidden>✕</button>
+    </div>
     <div id="entry-list" class="entry-list"></div>
     <div id="empty-state" class="empty-state" hidden>
       <div class="empty-icon">✦</div>
@@ -51,10 +56,14 @@
       </div>
     </section>
 
+    <section id="budget-card" class="card budget-card" hidden></section>
+
     <div class="seg" id="report-seg">
       <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
       <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
     </div>
+
+    <section id="trend-card" class="card trend-card"></section>
 
     <section id="report-breakdown" class="card breakdown-card"></section>
   </main>
@@ -134,6 +143,18 @@
     </div>
     <div id="cat-list" class="cat-list"></div>
 
+    <div class="section-label" data-i18n="monthlyBudget">每月總預算</div>
+    <div class="cat-list">
+      <label class="cat-row budget-row">
+        <span class="budget-field-prefix">RM</span>
+        <input id="budget-input" class="budget-inline-input num" type="text" inputmode="decimal" placeholder="0.00">
+      </label>
+    </div>
+
+    <div class="section-label" data-i18n="recurringSection">固定支出</div>
+    <div id="recur-list" class="cat-list"></div>
+    <p class="backup-hint" data-i18n="recurringHint">每月自動產生一筆,可照常編輯或刪除。</p>
+
     <div class="section-label" data-i18n="backupSection">資料備份</div>
     <div class="cat-list">
       <button id="export-btn" class="cat-row cat-row-add" type="button">
@@ -147,6 +168,17 @@
     </div>
     <p class="backup-hint" data-i18n="backupHint">帳目只存在這台裝置上,建議定期匯出備份。</p>
     <input type="file" id="import-file" accept=".json,application/json" hidden>
+
+    <div class="section-label" data-i18n="lockSection">App 鎖</div>
+    <div class="cat-list">
+      <button id="lock-row" class="cat-row" type="button">
+        <svg class="row-icon" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8"/></svg>
+        <span class="cat-row-name" data-i18n="setPin">設定 PIN 碼</span>
+        <span id="lock-status" class="cat-row-count"></span>
+        <span class="cat-row-chevron">›</span>
+      </button>
+    </div>
+    <p class="backup-hint" data-i18n="lockHint">開啟後每次打開 App 需輸入 PIN(僅存在本機,不含在備份中)。</p>
 
     <div class="section-label" data-i18n="appSection">App</div>
     <div class="cat-list">
@@ -170,7 +202,39 @@
     </div>
     <input id="cat-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="categoryName" placeholder="分類名稱" maxlength="12">
     <div id="color-grid" class="color-grid"></div>
+    <label id="cat-budget-field" class="budget-field">
+      <span class="budget-field-prefix">RM</span>
+      <input id="cat-budget-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="categoryBudget" placeholder="每月預算（可空）">
+    </label>
     <button id="cat-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteCategory" hidden>刪除分類</button>
+  </section>
+
+  <!-- 固定支出編輯器 -->
+  <div id="recur-editor-backdrop" class="backdrop editor-backdrop"></div>
+  <section id="recur-editor" class="sheet cat-editor">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="recur-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
+      <span id="recur-editor-title" class="sheet-title">固定支出</span>
+      <button id="recur-save" class="sheet-header-btn strong" type="button" data-i18n="save">儲存</button>
+    </div>
+    <div class="seg seg-small recur-seg" id="recur-type-seg">
+      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
+      <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
+    </div>
+    <label class="budget-field">
+      <span class="budget-field-prefix">RM</span>
+      <input id="recur-amount-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="amountLabel" placeholder="金額">
+    </label>
+    <div id="recur-cat-row" class="category-row"></div>
+    <div class="field-row">
+      <input id="recur-note-input" class="field-input" type="text" data-i18n-ph="notePlaceholder" placeholder="備註（可空）" maxlength="60">
+      <label class="day-field">
+        <span class="day-prefix" data-i18n="dayOfMonth">每月幾號</span>
+        <input id="recur-day-input" class="field-input day-input num" type="number" min="1" max="28" value="1">
+      </label>
+    </div>
+    <button id="recur-delete-btn" class="cat-delete-btn" type="button" data-i18n="delete" hidden>刪除</button>
   </section>
 
   <!-- 分類明細(點報表分類進入) -->
@@ -183,6 +247,31 @@
     <div id="detail-summary" class="detail-summary"></div>
     <div id="detail-list" class="cat-list"></div>
   </section>
+
+  <!-- PIN 鎖屏 -->
+  <div id="lock-screen" class="lock-screen" hidden>
+    <div class="lock-inner">
+      <svg class="lock-glyph" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.6"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.6"/></svg>
+      <div id="lock-title" class="lock-title"></div>
+      <div id="lock-dots" class="lock-dots"></div>
+      <div id="lock-error" class="lock-error"></div>
+      <div class="lock-keypad">
+        <button class="key lock-key" data-key="1" type="button">1</button>
+        <button class="key lock-key" data-key="2" type="button">2</button>
+        <button class="key lock-key" data-key="3" type="button">3</button>
+        <button class="key lock-key" data-key="4" type="button">4</button>
+        <button class="key lock-key" data-key="5" type="button">5</button>
+        <button class="key lock-key" data-key="6" type="button">6</button>
+        <button class="key lock-key" data-key="7" type="button">7</button>
+        <button class="key lock-key" data-key="8" type="button">8</button>
+        <button class="key lock-key" data-key="9" type="button">9</button>
+        <span></span>
+        <button class="key lock-key" data-key="0" type="button">0</button>
+        <button class="key lock-key key-del" data-key="del" type="button">⌫</button>
+      </div>
+      <button id="lock-done" class="save-btn lock-done" type="button" data-i18n="done" hidden>完成</button>
+    </div>
+  </div>
 
   <script type="module" src="app.js"></script>
 </body>
