@@ -122,6 +122,9 @@ const STRINGS = {
     scanReceipt: '掃描收據',
     scanningReceipt: '辨識中…',
     receiptFailed: '收據辨識失敗,請改用手動輸入。',
+    receiptQuota: (n) => `本月免費掃描已用完(${n} 張)。可手動記帳,或下個月再試。`,
+    receiptRate: '掃描太頻繁,請稍後再試。',
+    receiptBusy: '伺服器忙碌中,請稍後再試。',
     langBtn: 'EN',
   },
   en: {
@@ -243,6 +246,9 @@ const STRINGS = {
     scanReceipt: 'Scan receipt',
     scanningReceipt: 'Scanning…',
     receiptFailed: "Couldn't read the receipt — please enter manually.",
+    receiptQuota: (n) => `You've used all ${n} free scans this month. Add it manually, or try next month.`,
+    receiptRate: 'Too many scans right now — please try again shortly.',
+    receiptBusy: 'The server is busy — please try again later.',
     langBtn: '中文',
   },
 };
@@ -250,7 +256,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v10';
+const APP_VERSION = 'v11';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1887,6 +1893,16 @@ async function onSyncEnable() {
 // ---------- 收據辨識(Claude vision) ----------
 const RECEIPT_ENDPOINT = 'https://daily-ledger-sync.yuxuanchin95.workers.dev/receipt';
 
+// 匿名安裝 ID:用於收據用量計量(不含個資,清除資料會重置)
+function getInstallId() {
+  let id = localStorage.getItem('installId');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('installId', id);
+  }
+  return id;
+}
+
 // 縮圖 + 轉 JPEG base64,壓低上傳量
 async function fileToBase64(file, maxDim = 1280, quality = 0.7) {
   const dataUrl = await new Promise((res, rej) => {
@@ -1925,9 +1941,17 @@ async function onReceiptFile(file) {
     const res = await fetch(RECEIPT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, mediaType: 'image/jpeg', categories: names }),
+      body: JSON.stringify({ image, mediaType: 'image/jpeg', categories: names, installId: getInstallId() }),
     });
-    if (!res.ok) throw new Error('receipt failed');
+    if (!res.ok) {
+      let e = {};
+      try { e = await res.json(); } catch {}
+      if (res.status === 429 && e.error === 'quota') alert(t('receiptQuota', e.limit ?? 5));
+      else if (res.status === 429) alert(t('receiptRate'));
+      else if (res.status === 503) alert(t('receiptBusy'));
+      else alert(t('receiptFailed'));
+      return;
+    }
     const r = await res.json();
 
     setSheetType('expense'); // 收據一律當支出
