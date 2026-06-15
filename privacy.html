@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Centsei — Privacy Policy</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; background:#000; color:#e8e6e0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.65; }
+  main { max-width:680px; margin:0 auto; padding:32px 20px calc(env(safe-area-inset-bottom) + 48px); }
+  h1 { font-size:28px; color:#d9b64d; margin:0 0 4px; }
+  .eff { color:#9b988f; font-size:13px; margin-bottom:28px; }
+  h2 { font-size:18px; margin:28px 0 8px; }
+  p, li { color:#cfcdc6; font-size:15px; }
+  a { color:#d9b64d; }
+  .note { background:rgba(217,182,77,0.08); border:1px solid rgba(217,182,77,0.25); border-radius:12px; padding:12px 16px; font-size:13px; color:#9b988f; }
+  code { background:#1c1c1e; padding:1px 6px; border-radius:5px; font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Privacy Policy — Centsei</h1>
+  <div class="eff">Last updated: 15 June 2026</div>
+
+  <p>Centsei is a personal expense tracker built to be <strong>private by default</strong>. This policy explains exactly what happens to your data.</p>
+
+  <h2>1. Your data lives on your device</h2>
+  <p>Your transactions, categories, budgets, and settings are stored <strong>locally on your device</strong> (in the browser's IndexedDB / localStorage). We do not have a server that holds your ledger, and we cannot see it.</p>
+
+  <h2>2. Optional cloud sync — end-to-end encrypted</h2>
+  <p>If you turn on Cloud Sync, your data is <strong>encrypted on your device</strong> (AES-GCM, with a key derived from your sync code) <em>before</em> it is uploaded. Our server stores only the encrypted blob and can never read its contents. Your sync code and encryption key never leave your device. If you lose your sync code, the data cannot be decrypted by anyone, including us.</p>
+
+  <h2>3. Receipt scanning (third-party AI)</h2>
+  <p>If you use "Scan receipt", the photo you choose is sent — over an encrypted connection, through our processing endpoint — to <strong>Anthropic</strong> (the Claude API) solely to extract the amount, date, merchant, and category. We do <strong>not</strong> store the image; it is processed and discarded. Anthropic processes the image under its own terms; per Anthropic's policy, API inputs are not used to train its models. If you do not use receipt scanning, no images are ever sent anywhere.</p>
+  <p>If you supply your own Anthropic API key (optional), that key is held only in memory to forward the request and is <strong>never stored or logged</strong> by us; it is saved only on your own device.</p>
+
+  <h2>4. No accounts, no ads, no tracking</h2>
+  <p>Centsei has no sign-up, no advertising, and no analytics or third-party trackers. To enforce the free monthly receipt-scan limit, an anonymous random identifier (a <code>UUID</code>) is generated on your device and sent only with scan requests. It is not linked to your identity and contains no personal information.</p>
+
+  <h2>5. Children</h2>
+  <p>Centsei is a general-audience utility and is not directed at children under 13.</p>
+
+  <h2>6. Deleting your data</h2>
+  <p>Because data is local, you can remove it by deleting your entries, clearing the app's website data, or uninstalling. If you used Cloud Sync, stopping sync leaves the encrypted copy until it expires or is overwritten.</p>
+
+  <h2>7. Changes</h2>
+  <p>We may update this policy; the "Last updated" date will change accordingly.</p>
+
+  <h2>8. Contact</h2>
+  <p>Questions about privacy: <a href="mailto:yuxuanchin95@gmail.com">yuxuanchin95@gmail.com</a></p>
+
+  <p class="note">This document is a good-faith plain-language summary, not legal advice. Before selling Centsei in your market (and especially for GDPR/EU, UK, CCPA/California users), have a qualified lawyer review it and add any jurisdiction-specific terms.</p>
+</main>
+</body>
+</html>

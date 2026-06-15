@@ -902,6 +902,23 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .budget-field-prefix { color: var(--text-2); font-size: 15px; font-weight: 600; flex: none; }
 .budget-field .field-input { background: none; border-radius: 0; padding-left: 0; padding-right: 0; }
 
+/* 設定:自備金鑰輸入 */
+.byo-row { display: block; padding: 13px 16px; }
+.byo-input {
+  width: 100%;
+  background: none;
+  border: none;
+  outline: none;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+  letter-spacing: 0.5px;
+}
+.byo-input::placeholder { color: var(--text-3); }
+
+/* 設定:法律連結 */
+.legal-row { text-decoration: none; color: var(--text); }
+
 /* 設定:整月預算行 */
 .budget-row { display: flex; align-items: center; gap: 10px; }
 .budget-inline-input {

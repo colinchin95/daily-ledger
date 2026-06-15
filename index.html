@@ -190,6 +190,14 @@
     <p class="backup-hint" id="backup-status"></p>
     <input type="file" id="import-file" accept=".json,application/json" hidden>
 
+    <div class="section-label" data-i18n="receiptSection">收據辨識</div>
+    <div class="cat-list">
+      <label class="cat-row byo-row">
+        <input id="userkey-input" class="byo-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="byoPlaceholder" placeholder="sk-ant-…(自備金鑰,可空)">
+      </label>
+    </div>
+    <p class="backup-hint" data-i18n="byoHint">貼上你自己的 Anthropic 金鑰 → 收據掃描無限、不佔免費額度。</p>
+
     <div class="section-label" data-i18n="syncSection">雲端同步</div>
     <div class="cat-list">
       <button id="sync-row" class="cat-row" type="button">
@@ -220,6 +228,18 @@
       </button>
     </div>
     <p class="backup-hint" data-i18n="updateHint">下載最新版本並重新整理(資料不受影響)。</p>
+
+    <div class="section-label" data-i18n="legalSection">法律</div>
+    <div class="cat-list">
+      <a class="cat-row legal-row" href="privacy.html" target="_blank" rel="noopener">
+        <span class="cat-row-name" data-i18n="privacyPolicy">隱私政策</span>
+        <span class="cat-row-chevron">›</span>
+      </a>
+      <a class="cat-row legal-row" href="terms.html" target="_blank" rel="noopener">
+        <span class="cat-row-name" data-i18n="termsOfService">服務條款</span>
+        <span class="cat-row-chevron">›</span>
+      </a>
+    </div>
   </section>
 
   <!-- 分類編輯器 -->

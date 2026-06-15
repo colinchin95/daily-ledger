@@ -1,6 +1,6 @@
 // Service Worker:App 殼層快取,離線也能開
 // 改版時把 VERSION +1,舊快取會在 activate 時清掉
-const VERSION = 'daily-ledger-v11';
+const VERSION = 'daily-ledger-v12';
 
 const SHELL = [
   './',
@@ -10,6 +10,8 @@ const SHELL = [
   './db.js',
   './lib/idb-keyval.js',
   './manifest.json',
+  './privacy.html',
+  './terms.html',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',

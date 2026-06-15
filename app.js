@@ -125,6 +125,13 @@ const STRINGS = {
     receiptQuota: (n) => `本月免費掃描已用完(${n} 張)。可手動記帳,或下個月再試。`,
     receiptRate: '掃描太頻繁,請稍後再試。',
     receiptBusy: '伺服器忙碌中,請稍後再試。',
+    byoKeyInvalid: '你的 Anthropic 金鑰無效,請檢查後重試。',
+    receiptSection: '收據辨識',
+    byoPlaceholder: 'sk-ant-…(自備金鑰,可空)',
+    byoHint: '貼上你自己的 Anthropic 金鑰 → 收據掃描無限、不佔免費額度(金鑰只存在本機,不含在備份)。留空則使用免費額度(每月 5 張)。',
+    legalSection: '法律',
+    privacyPolicy: '隱私政策',
+    termsOfService: '服務條款',
     langBtn: 'EN',
   },
   en: {
@@ -249,6 +256,13 @@ const STRINGS = {
     receiptQuota: (n) => `You've used all ${n} free scans this month. Add it manually, or try next month.`,
     receiptRate: 'Too many scans right now — please try again shortly.',
     receiptBusy: 'The server is busy — please try again later.',
+    byoKeyInvalid: 'Your Anthropic key is invalid — please check and try again.',
+    receiptSection: 'Receipt scanning',
+    byoPlaceholder: 'sk-ant-… (your own key, optional)',
+    byoHint: "Paste your own Anthropic key → unlimited scans that don't use the free quota (stored on this device only, never in backups). Leave empty to use the free quota (5/month).",
+    legalSection: 'Legal',
+    privacyPolicy: 'Privacy Policy',
+    termsOfService: 'Terms of Service',
     langBtn: '中文',
   },
 };
@@ -256,7 +270,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v11';
+const APP_VERSION = 'v12';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1029,6 +1043,7 @@ function openCatModal() {
   renderLockStatus();
   updateBackupStatus();
   updateSyncStatus();
+  $('#userkey-input').value = localStorage.getItem('userAnthropicKey') || '';
   catModalEl.classList.add('open');
 }
 
@@ -1941,7 +1956,13 @@ async function onReceiptFile(file) {
     const res = await fetch(RECEIPT_ENDPOINT, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image, mediaType: 'image/jpeg', categories: names, installId: getInstallId() }),
+      body: JSON.stringify({
+        image,
+        mediaType: 'image/jpeg',
+        categories: names,
+        installId: getInstallId(),
+        userKey: localStorage.getItem('userAnthropicKey') || undefined,
+      }),
     });
     if (!res.ok) {
       let e = {};
@@ -1949,6 +1970,7 @@ async function onReceiptFile(file) {
       if (res.status === 429 && e.error === 'quota') alert(t('receiptQuota', e.limit ?? 5));
       else if (res.status === 429) alert(t('receiptRate'));
       else if (res.status === 503) alert(t('receiptBusy'));
+      else if (e.error === 'ai_failed' && e.status === 401) alert(t('byoKeyInvalid'));
       else alert(t('receiptFailed'));
       return;
     }
@@ -1980,6 +2002,12 @@ async function onReceiptFile(file) {
 
 // ---------- 事件繫結 ----------
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
+
+$('#userkey-input').addEventListener('change', (e) => {
+  const v = e.target.value.trim();
+  if (v) localStorage.setItem('userAnthropicKey', v);
+  else localStorage.removeItem('userAnthropicKey');
+});
 
 $('#receipt-btn').addEventListener('click', () => $('#receipt-input').click());
 $('#receipt-input').addEventListener('change', (e) => {
