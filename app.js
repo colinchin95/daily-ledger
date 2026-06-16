@@ -122,7 +122,9 @@ const STRINGS = {
     scanReceipt: '掃描收據',
     scanningReceipt: '辨識中…',
     receiptFailed: '收據辨識失敗,請改用手動輸入。',
-    receiptQuota: (n) => `本月免費掃描已用完(${n} 張)。可手動記帳,或下個月再試。`,
+    receiptQuota: (n) => `本月免費掃描已用完(${n} 張)。升級 Pro 即可無限掃描,或先手動記帳。`,
+    proPitch: '升級 Pro:每張收據拍照,AI 幫你自動填好金額、日期、商家、分類——省下手動輸入的麻煩,想拍多少就拍多少。免費版每月 5 張。',
+    proThanks: '感謝支持 Centsei 💛 你的收據掃描現在無限使用。',
     receiptRate: '掃描太頻繁,請稍後再試。',
     receiptBusy: '伺服器忙碌中,請稍後再試。',
     byoKeyInvalid: '你的 Anthropic 金鑰無效,請檢查後重試。',
@@ -258,7 +260,9 @@ const STRINGS = {
     scanReceipt: 'Scan receipt',
     scanningReceipt: 'Scanning…',
     receiptFailed: "Couldn't read the receipt — please enter manually.",
-    receiptQuota: (n) => `You've used all ${n} free scans this month. Add it manually, or try next month.`,
+    receiptQuota: (n) => `You've used all ${n} free scans this month. Upgrade to Pro for unlimited, or add it manually.`,
+    proPitch: 'Go Pro: snap any receipt and AI auto-fills the amount, date, merchant, and category — no more typing, scan as much as you want. Free plan includes 5 scans a month.',
+    proThanks: 'Thanks for supporting Centsei 💛 Your receipt scanning is now unlimited.',
     receiptRate: 'Too many scans right now — please try again shortly.',
     receiptBusy: 'The server is busy — please try again later.',
     byoKeyInvalid: 'Your Anthropic key is invalid — please check and try again.',
@@ -280,7 +284,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v13';
+const APP_VERSION = 'v14';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -537,6 +541,7 @@ function setLang(l) {
   renderReport();
   renderCatList();
   if (detailCatId !== null) renderCatDetail();
+  updateProUI();
   $('#cat-editor-title').textContent = editingCatId ? t('editCategory') : t('newCategory');
 }
 
@@ -2020,15 +2025,18 @@ let proUntil = null;
 function updateProUI() {
   const label = $('#pro-label');
   const status = $('#pro-status');
+  const hint = $('#pro-hint');
   if (isPro) {
     label.textContent = t('proActive');
     const d = proUntil ? new Date(proUntil * 1000).toLocaleDateString(lang === 'en' ? 'en-MY' : 'zh-Hant') : '';
     status.textContent = d ? t('proUntil', d) : '';
     $('#pro-btn').classList.add('is-pro');
+    hint.textContent = t('proThanks');
   } else {
     label.textContent = t('upgradePro');
     status.textContent = '';
     $('#pro-btn').classList.remove('is-pro');
+    hint.textContent = t('proPitch');
   }
 }
 
@@ -2226,6 +2234,7 @@ async function init() {
   ]);
   await materializeRecurring();   // 補當月固定支出
   renderList();
+  switchView('report');           // 預設開在「報表」頁
   maybeShowBackupBanner();        // 太久沒備份就提醒
 
   // PWA:註冊 service worker(需要 https 或 localhost)

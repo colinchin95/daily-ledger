@@ -909,6 +909,9 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .pro-row.is-pro .row-icon { color: var(--green); }
 .pro-row.is-pro .cat-row-chevron { display: none; }
 
+/* Pro 價值說明:同時拉開兩張卡的間距 */
+.pro-hint { margin: 10px 2px 18px; line-height: 1.6; }
+
 /* 設定:自備金鑰輸入 */
 .byo-row { display: block; padding: 13px 16px; }
 .byo-input {
