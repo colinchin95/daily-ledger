@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Centsei — Private, AI-powered expense tracking</title>
+<meta name="description" content="Centsei is a private, local-first expense tracker with AI receipt scanning. Free, no account, your data stays on your device.">
+<meta property="og:title" content="Centsei — Private expense tracking with AI receipt scanning">
+<meta property="og:description" content="Snap a receipt, AI fills it in. Budgets, reports, encrypted sync. Free, no account.">
+<meta property="og:image" content="icons/icon-512.png">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<style>
+  :root{
+    --bg:#000; --surface:#15151b; --surface2:#1f1f28; --text:#ece9e1; --text2:#9b988f;
+    --gold:#d9b64d; --gold-b:#f0d275; --gold-d:#a8862a; --green:#66cb87; --sep:rgba(255,255,255,.08);
+    color-scheme:dark;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang TC","Noto Sans TC",sans-serif;
+    -webkit-font-smoothing:antialiased;line-height:1.6}
+  a{color:var(--gold);text-decoration:none}
+  .wrap{max-width:960px;margin:0 auto;padding:0 22px}
+  .btn{display:inline-flex;align-items:center;gap:8px;justify-content:center;
+    font-weight:700;font-size:17px;padding:15px 30px;border-radius:14px;border:none;cursor:pointer;
+    color:#1d1605;background:linear-gradient(170deg,var(--gold-b),var(--gold) 55%,var(--gold-d));
+    box-shadow:0 6px 24px rgba(217,182,77,.32),inset 0 1px 0 rgba(255,255,255,.45)}
+  .btn.ghost{color:var(--gold);background:none;box-shadow:none;border:1px solid rgba(217,182,77,.4)}
+  .btn:active{transform:scale(.98)}
+
+  /* hero */
+  header{padding:64px 0 40px;text-align:center;
+    background:radial-gradient(900px 420px at 50% -120px,rgba(217,182,77,.12),transparent 60%)}
+  .logo{width:96px;height:96px;border-radius:24px;display:block;margin:0 auto 22px;
+    box-shadow:0 10px 40px rgba(217,182,77,.25)}
+  h1{font-size:clamp(34px,7vw,56px);line-height:1.05;margin:0 0 14px;letter-spacing:-.5px}
+  h1 .g{background:linear-gradient(90deg,var(--gold-b),var(--gold));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:clamp(17px,3.4vw,21px);color:var(--text2);max-width:620px;margin:0 auto 30px}
+  .cta-row{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .badges{margin-top:22px;color:var(--text2);font-size:14px}
+  .badges b{color:var(--text)}
+
+  section{padding:54px 0}
+  h2{font-size:clamp(26px,4.5vw,34px);text-align:center;margin:0 0 8px}
+  .lead{text-align:center;color:var(--text2);max-width:600px;margin:0 auto 36px}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px}
+  .card{background:var(--surface);border:1px solid var(--sep);border-radius:18px;padding:24px}
+  .card .ic{width:40px;height:40px;color:var(--gold);margin-bottom:12px}
+  .card h3{margin:0 0 6px;font-size:18px}
+  .card p{margin:0;color:var(--text2);font-size:15px}
+
+  /* pricing */
+  .price-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;max-width:680px;margin:0 auto}
+  .plan{background:var(--surface);border:1px solid var(--sep);border-radius:20px;padding:28px}
+  .plan.pro{border-color:rgba(217,182,77,.5);background:linear-gradient(180deg,rgba(217,182,77,.08),var(--surface))}
+  .plan .name{font-size:15px;letter-spacing:1px;color:var(--text2);text-transform:uppercase}
+  .plan .amt{font-size:40px;font-weight:800;margin:6px 0 2px}
+  .plan .amt span{font-size:16px;font-weight:500;color:var(--text2)}
+  .plan ul{list-style:none;padding:0;margin:18px 0 0}
+  .plan li{padding:7px 0 7px 26px;position:relative;color:var(--text);font-size:15px}
+  .plan li::before{content:"✓";position:absolute;left:0;color:var(--green);font-weight:700}
+
+  /* install */
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px}
+  .step{background:var(--surface);border:1px solid var(--sep);border-radius:16px;padding:22px}
+  .step .os{font-weight:700;color:var(--gold);margin-bottom:10px}
+  .step ol{margin:0;padding-left:18px;color:var(--text2);font-size:14.5px}
+  .step li{margin:5px 0}
+
+  footer{border-top:1px solid var(--sep);padding:30px 0 50px;text-align:center;color:var(--text2);font-size:14px}
+  footer a{margin:0 10px}
+  .disclaimer{max-width:640px;margin:18px auto 0;font-size:12.5px;color:#5e5c55;line-height:1.5}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <img class="logo" src="icons/icon-512.png" alt="Centsei">
+    <h1>Track every cent.<br><span class="g">Privately.</span></h1>
+    <p class="sub">Centsei is a beautifully simple expense tracker. Snap a receipt and AI fills it in. Your data stays on your device — no account, no ads, no tracking.</p>
+    <div class="cta-row">
+      <a class="btn" href="./">Open Centsei →</a>
+      <a class="btn ghost" href="#install">How to install</a>
+    </div>
+    <div class="badges"><b>Free</b> · No account · <b>Private by design</b> · Works offline</div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <h2>Why Centsei</h2>
+    <p class="lead">Most money apps sell your data or bury you in ads. Centsei does the opposite.</p>
+    <div class="grid">
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9.5 12.5 2 2 3.5-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Private by design</h3>
+        <p>Your records live on your device. Optional cloud sync is end-to-end encrypted — even we can't read it.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M4 8.5 5.5 7 7 8.5 8.5 7 10 8.5 11.5 7 13 8.5 14.5 7 16 8.5 17.5 7 19 8.5V20l-2-1.2L13 20l-2-1.2L9 20l-2-1.2L4 20V8.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11.5h9M7 14.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <h3>AI receipt scanning</h3>
+        <p>Snap any receipt — AI fills in the amount, date, merchant, and category. No more typing.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M5 20v-7M12 20V4M19 20v-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <h3>Budgets &amp; reports</h3>
+        <p>Monthly budgets with overspend alerts, category breakdowns, and a 6-month spending trend.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3v6m0 0 3-3m-3 3-3-3M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Yours to keep</h3>
+        <p>One-tap JSON / CSV export. Bilingual (English &amp; 繁中). Installs like a real app, works fully offline.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="background:var(--surface)">
+  <div class="wrap">
+    <h2>Simple pricing</h2>
+    <p class="lead">Everything you need is free. Pay only if you want unlimited AI scanning.</p>
+    <div class="price-grid">
+      <div class="plan">
+        <div class="name">Free</div>
+        <div class="amt">$0</div>
+        <ul>
+          <li>Unlimited manual entries</li>
+          <li>Budgets, reports &amp; trends</li>
+          <li>Encrypted cloud sync</li>
+          <li>JSON / CSV backup</li>
+          <li>5 AI receipt scans / month</li>
+        </ul>
+      </div>
+      <div class="plan pro">
+        <div class="name" style="color:var(--gold)">Pro</div>
+        <div class="amt">$2.99<span> / month</span></div>
+        <ul>
+          <li>Everything in Free</li>
+          <li><b>Unlimited</b> AI receipt scanning</li>
+          <li>Support an indie, privacy-first app</li>
+          <li>Cancel anytime</li>
+        </ul>
+      </div>
+    </div>
+    <p class="lead" style="margin-top:24px;font-size:14px">Prefer to bring your own Anthropic API key? Do that for free, unlimited scans — right inside the app.</p>
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <h2>Install in 10 seconds</h2>
+    <p class="lead">Centsei is a web app — no app store needed. Add it to your home screen and it behaves like a native app.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="os"> iPhone / iPad</div>
+        <ol>
+          <li>Open Centsei in <b>Safari</b></li>
+          <li>Tap the <b>Share</b> button</li>
+          <li>Tap <b>Add to Home Screen</b></li>
+        </ol>
+      </div>
+      <div class="step">
+        <div class="os">🤖 Android</div>
+        <ol>
+          <li>Open Centsei in <b>Chrome</b></li>
+          <li>Tap the <b>⋮</b> menu</li>
+          <li>Tap <b>Install app</b></li>
+        </ol>
+      </div>
+      <div class="step">
+        <div class="os">💻 Desktop</div>
+        <ol>
+          <li>Open Centsei in <b>Chrome / Edge</b></li>
+          <li>Click the <b>Install</b> icon in the address bar</li>
+          <li>Launch it like any app</li>
+        </ol>
+      </div>
+    </div>
+    <div class="cta-row" style="margin-top:34px"><a class="btn" href="./">Open Centsei →</a></div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a href="./">Open app</a>·
+      <a href="privacy.html">Privacy</a>·
+      <a href="terms.html">Terms</a>
+    </div>
+    <p style="margin:14px 0 0">© 2026 Centsei</p>
+    <p class="disclaimer">Centsei is a personal-finance tool, not financial advice. Receipt scanning sends the photo to a third-party AI service for processing; see the Privacy Policy.</p>
+  </div>
+</footer>
+
+</body>
+</html>
