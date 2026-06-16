@@ -305,7 +305,8 @@ const STRINGS = {
   },
 };
 
-let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
+// 預設語言為英文(對外銷售);使用者若曾手動選「中文」則尊重其選擇
+let lang = localStorage.getItem('lang') === 'zh' ? 'zh' : 'en';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 const APP_VERSION = 'v17';
