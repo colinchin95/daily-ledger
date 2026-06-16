@@ -93,6 +93,8 @@ const STRINGS = {
     backupReminderNever: '你的帳目只在這台裝置上,建議現在備份一次。',
     backupNow: '立即備份',
     later: '稍後',
+    protectMsg: '開啟雲端同步,資料就不會因換手機或刪除 App 而遺失(端到端加密、免帳號)。',
+    protectEnable: '開啟同步',
     lastBackup: (n) => `上次備份:${n} 天前`,
     lastBackupToday: '上次備份:今天',
     lastBackupNever: '尚未備份',
@@ -231,6 +233,8 @@ const STRINGS = {
     backupReminderNever: 'Your data lives only on this device — back it up now.',
     backupNow: 'Back up now',
     later: 'Later',
+    protectMsg: 'Turn on Cloud Sync so your data is never lost if you switch phones or delete the app (end-to-end encrypted, no account).',
+    protectEnable: 'Turn on sync',
     lastBackup: (n) => `Last backup: ${n} day${n === 1 ? '' : 's'} ago`,
     lastBackupToday: 'Last backup: today',
     lastBackupNever: 'Never backed up',
@@ -284,7 +288,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v15';
+const APP_VERSION = 'v16';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1418,6 +1422,24 @@ function snoozeBackupBanner() {
   hideBackupBanner();
 }
 
+// 資料保護提示:有資料但還沒開雲端同步時,提醒開啟(避免換機/刪 App 丟資料)
+function maybeShowProtectBanner() {
+  const el = $('#protect-banner');
+  if (!el) return;
+  if (syncEnabled() || entries.length < 3) { el.hidden = true; return; }
+  if (Date.now() < (Number(localStorage.getItem('protectSnoozeUntil')) || 0)) { el.hidden = true; return; }
+  el.querySelector('.protect-text').textContent = t('protectMsg');
+  el.hidden = false;
+}
+function hideProtectBanner() {
+  const el = $('#protect-banner');
+  if (el) el.hidden = true;
+}
+function snoozeProtectBanner() {
+  localStorage.setItem('protectSnoozeUntil', String(Date.now() + 3 * DAY_MS));
+  hideProtectBanner();
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function sanitizeEntry(e) {
@@ -1860,6 +1882,7 @@ async function enableSync(code) {
     /* 失敗:仍保持啟用,dirty 會在下次重試 */
   }
   updateSyncStatus();
+  hideProtectBanner(); // 已開同步 → 收起保護提示
 }
 
 function disableSync() {
@@ -2157,6 +2180,10 @@ $('#import-btn').addEventListener('click', () => $('#import-file').click());
 // 備份提醒橫幅
 $('#backup-banner-now').addEventListener('click', exportBackup);
 $('#backup-banner-later').addEventListener('click', snoozeBackupBanner);
+
+// 資料保護提示橫幅
+$('#protect-enable').addEventListener('click', () => { hideProtectBanner(); openSyncSheet(); });
+$('#protect-later').addEventListener('click', snoozeProtectBanner);
 $('#import-file').addEventListener('change', (e) => {
   onImportFile(e.target.files[0]);
   e.target.value = '';
@@ -2235,6 +2262,7 @@ async function init() {
   await materializeRecurring();   // 補當月固定支出
   renderList();
   switchView('report');           // 預設開在「報表」頁
+  maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
   maybeShowBackupBanner();        // 太久沒備份就提醒
 
   // PWA:註冊 service worker(需要 https 或 localhost)

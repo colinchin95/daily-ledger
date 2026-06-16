@@ -851,6 +851,9 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 }
 .backup-banner-btn:active { opacity: 0.7; }
 
+/* 資料保護提示(在 header 下、視圖之上,左右需自帶邊距) */
+.protect-banner { margin: 4px 16px 6px; }
+
 /* ---------- 預算 ---------- */
 .budget-card { padding: 16px 18px; }
 

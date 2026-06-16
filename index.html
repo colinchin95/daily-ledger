@@ -23,6 +23,18 @@
     <h1 class="large-title" data-i18n="appTitle">Centsei</h1>
   </header>
 
+  <!-- 資料保護提示:有資料但未開同步時提醒 -->
+  <div id="protect-banner" class="backup-banner protect-banner" hidden>
+    <div class="backup-banner-row">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9.5 12.5 11.5 14.5 15 10.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span class="backup-banner-text protect-text"></span>
+    </div>
+    <div class="backup-banner-actions">
+      <button id="protect-later" class="backup-banner-btn backup-banner-later" type="button" data-i18n="later">稍後</button>
+      <button id="protect-enable" class="backup-banner-btn backup-banner-now" type="button" data-i18n="protectEnable">開啟同步</button>
+    </div>
+  </div>
+
   <!-- 明細 -->
   <main id="view-list" class="view">
     <div id="backup-banner" class="backup-banner" hidden>
