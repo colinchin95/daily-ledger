@@ -284,7 +284,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v14';
+const APP_VERSION = 'v15';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
