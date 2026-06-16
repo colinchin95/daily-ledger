@@ -3,6 +3,12 @@ import {
   getMeta, saveMeta, getRecurring, saveRecurring,
 } from './db.js';
 
+// 是否執行在原生 App(Capacitor / iOS 包裝版)殼層內。
+// iOS 上 Apple 規定數位內容只能用內購,不能用外部金流 → 隱藏 Pro 購買入口,
+// 只保留「恢復購買」(允許啟用在外部已購買的內容)。
+const IS_NATIVE = !!(window.Capacitor?.isNativePlatform?.());
+if (IS_NATIVE) document.documentElement.classList.add('is-native');
+
 // ---------- 多語系 ----------
 const STRINGS = {
   zh: {
@@ -127,6 +133,8 @@ const STRINGS = {
     receiptQuota: (n) => `本月免費掃描已用完(${n} 張)。升級 Pro 即可無限掃描,或先手動記帳。`,
     proPitch: '升級 Pro:每張收據拍照,AI 幫你自動填好金額、日期、商家、分類——省下手動輸入的麻煩,想拍多少就拍多少。免費版每月 5 張。',
     proThanks: '感謝支持 Centsei 💛 你的收據掃描現在無限使用。',
+    proNativeHint: '收據掃描是 Pro 功能。若你已在其他平台購買,點下方「恢復購買」即可啟用。',
+    receiptQuotaNative: '本月免費掃描已用完。請先手動記帳;若你已購買 Pro,點「恢復購買」即可無限使用。',
     receiptRate: '掃描太頻繁,請稍後再試。',
     receiptBusy: '伺服器忙碌中,請稍後再試。',
     byoKeyInvalid: '你的 Anthropic 金鑰無效,請檢查後重試。',
@@ -272,6 +280,8 @@ const STRINGS = {
     receiptQuota: (n) => `You've used all ${n} free scans this month. Upgrade to Pro for unlimited, or add it manually.`,
     proPitch: 'Go Pro: snap any receipt and AI auto-fills the amount, date, merchant, and category — no more typing, scan as much as you want. Free plan includes 5 scans a month.',
     proThanks: 'Thanks for supporting Centsei 💛 Your receipt scanning is now unlimited.',
+    proNativeHint: 'Receipt scanning is a Pro feature. Already purchased elsewhere? Tap “Restore purchase” below to activate.',
+    receiptQuotaNative: 'You’ve used all your free scans this month. Add entries manually, or tap “Restore purchase” if you already have Pro.',
     receiptRate: 'Too many scans right now — please try again shortly.',
     receiptBusy: 'The server is busy — please try again later.',
     byoKeyInvalid: 'Your Anthropic key is invalid — please check and try again.',
@@ -2017,7 +2027,7 @@ async function onReceiptFile(file) {
     if (!res.ok) {
       let e = {};
       try { e = await res.json(); } catch {}
-      if (res.status === 429 && e.error === 'quota') alert(t('receiptQuota', e.limit ?? 5));
+      if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
       else if (res.status === 429) alert(t('receiptRate'));
       else if (res.status === 503) alert(t('receiptBusy'));
       else if (e.error === 'ai_failed' && e.status === 401) alert(t('byoKeyInvalid'));
@@ -2069,9 +2079,13 @@ function updateProUI() {
     label.textContent = t('upgradePro');
     status.textContent = '';
     $('#pro-btn').classList.remove('is-pro');
-    hint.textContent = t('proPitch');
+    // iOS 上不得出現外部購買的價格/CTA → 隱藏購買鈕,改用中性說明
+    hint.textContent = IS_NATIVE ? t('proNativeHint') : t('proPitch');
   }
-  $('#restore-btn').hidden = isPro; // 已是 Pro 就不顯示恢復
+  // iOS 包裝版:永遠隱藏購買入口;Web 版維持原本行為
+  if (IS_NATIVE) $('#pro-btn').hidden = true;
+  // 恢復購買:已是 Pro 就不顯示;非 Pro 時顯示(iOS 也需要它來啟用外部購買)
+  $('#restore-btn').hidden = isPro;
 }
 
 async function onRestore() {
@@ -2302,8 +2316,9 @@ async function init() {
   maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
   maybeShowBackupBanner();        // 太久沒備份就提醒
 
-  // PWA:註冊 service worker(需要 https 或 localhost)
-  if ('serviceWorker' in navigator) {
+  // PWA:註冊 service worker(需要 https 或 localhost)。
+  // 原生 App 殼層內不需要 SW(資產已打包進 App),且 capacitor:// scheme 下會失敗。
+  if (!IS_NATIVE && 'serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
   }
 
