@@ -902,6 +902,13 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .budget-field-prefix { color: var(--text-2); font-size: 15px; font-weight: 600; flex: none; }
 .budget-field .field-input { background: none; border-radius: 0; padding-left: 0; padding-right: 0; }
 
+/* 設定:升級 Pro */
+.pro-row .row-icon { color: var(--gold); }
+.pro-row .cat-row-name { color: var(--gold); font-weight: 600; }
+.pro-row.is-pro .cat-row-name { color: var(--green); }
+.pro-row.is-pro .row-icon { color: var(--green); }
+.pro-row.is-pro .cat-row-chevron { display: none; }
+
 /* 設定:自備金鑰輸入 */
 .byo-row { display: block; padding: 13px 16px; }
 .byo-input {

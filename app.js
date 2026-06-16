@@ -127,6 +127,11 @@ const STRINGS = {
     receiptBusy: '伺服器忙碌中,請稍後再試。',
     byoKeyInvalid: '你的 Anthropic 金鑰無效,請檢查後重試。',
     receiptSection: '收據辨識',
+    upgradePro: '升級 Pro(US$2.99/月,無限掃描)',
+    proActive: 'Pro 已啟用',
+    proUntil: (d) => `至 ${d}`,
+    proWelcome: '已升級 Pro!收據掃描現在無限使用。',
+    proCheckoutFailed: '無法開啟付款頁,請稍後再試。',
     byoPlaceholder: 'sk-ant-…(自備金鑰,可空)',
     byoHint: '貼上你自己的 Anthropic 金鑰 → 收據掃描無限、不佔免費額度(金鑰只存在本機,不含在備份)。留空則使用免費額度(每月 5 張)。',
     legalSection: '法律',
@@ -258,6 +263,11 @@ const STRINGS = {
     receiptBusy: 'The server is busy — please try again later.',
     byoKeyInvalid: 'Your Anthropic key is invalid — please check and try again.',
     receiptSection: 'Receipt scanning',
+    upgradePro: 'Upgrade to Pro (US$2.99/mo, unlimited)',
+    proActive: 'Pro active',
+    proUntil: (d) => `until ${d}`,
+    proWelcome: "You're Pro! Receipt scanning is now unlimited.",
+    proCheckoutFailed: "Couldn't open the payment page — please try again.",
     byoPlaceholder: 'sk-ant-… (your own key, optional)',
     byoHint: "Paste your own Anthropic key → unlimited scans that don't use the free quota (stored on this device only, never in backups). Leave empty to use the free quota (5/month).",
     legalSection: 'Legal',
@@ -270,7 +280,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v12';
+const APP_VERSION = 'v13';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1044,6 +1054,8 @@ function openCatModal() {
   updateBackupStatus();
   updateSyncStatus();
   $('#userkey-input').value = localStorage.getItem('userAnthropicKey') || '';
+  updateProUI();
+  checkEntitlement();
   catModalEl.classList.add('open');
 }
 
@@ -2000,8 +2012,81 @@ async function onReceiptFile(file) {
   }
 }
 
+// ---------- Pro 訂閱(Stripe) ----------
+const WORKER_BASE = 'https://daily-ledger-sync.yuxuanchin95.workers.dev';
+let isPro = false;
+let proUntil = null;
+
+function updateProUI() {
+  const label = $('#pro-label');
+  const status = $('#pro-status');
+  if (isPro) {
+    label.textContent = t('proActive');
+    const d = proUntil ? new Date(proUntil * 1000).toLocaleDateString(lang === 'en' ? 'en-MY' : 'zh-Hant') : '';
+    status.textContent = d ? t('proUntil', d) : '';
+    $('#pro-btn').classList.add('is-pro');
+  } else {
+    label.textContent = t('upgradePro');
+    status.textContent = '';
+    $('#pro-btn').classList.remove('is-pro');
+  }
+}
+
+async function checkEntitlement() {
+  try {
+    const r = await fetch(`${WORKER_BASE}/entitlement?installId=${getInstallId()}`);
+    if (!r.ok) return;
+    const d = await r.json();
+    isPro = !!d.pro;
+    proUntil = d.until || null;
+    updateProUI();
+  } catch {
+    /* 離線:維持現狀 */
+  }
+}
+
+async function onProClick() {
+  if (isPro) return; // 已是 Pro
+  try {
+    const r = await fetch(`${WORKER_BASE}/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installId: getInstallId() }),
+    });
+    const d = await r.json();
+    if (d.url) window.location.href = d.url; // 轉到 Stripe 結帳
+    else alert(t('proCheckoutFailed'));
+  } catch {
+    alert(t('proCheckoutFailed'));
+  }
+}
+
+// 從 Stripe 結帳返回:驗證 session、開通 Pro
+async function handleProReturn() {
+  const params = new URLSearchParams(location.search);
+  const status = params.get('pro');
+  if (!status) return;
+  if (status === 'success' && params.get('session_id')) {
+    try {
+      const r = await fetch(
+        `${WORKER_BASE}/verify?session_id=${encodeURIComponent(params.get('session_id'))}&installId=${getInstallId()}`
+      );
+      const d = await r.json();
+      if (d.pro) {
+        isPro = true;
+        proUntil = d.until || null;
+        updateProUI();
+        alert(t('proWelcome'));
+      }
+    } catch {}
+  }
+  history.replaceState(null, '', location.pathname); // 清掉網址參數
+}
+
 // ---------- 事件繫結 ----------
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
+
+$('#pro-btn').addEventListener('click', onProClick);
 
 $('#userkey-input').addEventListener('change', (e) => {
   const v = e.target.value.trim();
@@ -2149,6 +2234,8 @@ async function init() {
   }
 
   initSync();   // 若已設定同步碼:拉回雲端最新並推送本機變動
+  handleProReturn();   // 處理 Stripe 結帳返回
+  checkEntitlement();  // 查詢 Pro 狀態
 }
 
 init();
