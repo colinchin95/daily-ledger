@@ -913,7 +913,20 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .pro-row.is-pro .cat-row-chevron { display: none; }
 
 /* Pro 價值說明:同時拉開兩張卡的間距 */
-.pro-hint { margin: 10px 2px 18px; line-height: 1.6; }
+.pro-hint { margin: 10px 2px 12px; line-height: 1.6; }
+.restore-link {
+  display: block;
+  margin: 0 2px 18px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--gold);
+  text-align: left;
+  cursor: pointer;
+}
+.restore-link:active { opacity: 0.5; }
 
 /* 設定:自備金鑰輸入 */
 .byo-row { display: block; padding: 13px 16px; }

@@ -136,6 +136,11 @@ const STRINGS = {
     proUntil: (d) => `至 ${d}`,
     proWelcome: '已升級 Pro!收據掃描現在無限使用。',
     proCheckoutFailed: '無法開啟付款頁,請稍後再試。',
+    restorePurchase: '恢復購買',
+    restorePrompt: '輸入你購買 Pro 時使用的 Email:',
+    restoreFound: 'Pro 已恢復!',
+    restoreNotFound: '找不到使用該 Email 的有效訂閱。',
+    restoreFailed: '恢復失敗,請稍後再試。',
     byoPlaceholder: 'sk-ant-…(自備金鑰,可空)',
     byoHint: '貼上你自己的 Anthropic 金鑰 → 收據掃描無限、不佔免費額度(金鑰只存在本機,不含在備份)。留空則使用免費額度(每月 5 張)。',
     legalSection: '法律',
@@ -276,6 +281,11 @@ const STRINGS = {
     proUntil: (d) => `until ${d}`,
     proWelcome: "You're Pro! Receipt scanning is now unlimited.",
     proCheckoutFailed: "Couldn't open the payment page — please try again.",
+    restorePurchase: 'Restore purchase',
+    restorePrompt: 'Enter the email you used to buy Pro:',
+    restoreFound: 'Pro restored!',
+    restoreNotFound: 'No active subscription found for that email.',
+    restoreFailed: 'Restore failed — please try again.',
     byoPlaceholder: 'sk-ant-… (your own key, optional)',
     byoHint: "Paste your own Anthropic key → unlimited scans that don't use the free quota (stored on this device only, never in backups). Leave empty to use the free quota (5/month).",
     legalSection: 'Legal',
@@ -288,7 +298,7 @@ const STRINGS = {
 let lang = localStorage.getItem('lang') === 'en' ? 'en' : 'zh';
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v16';
+const APP_VERSION = 'v17';
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2061,6 +2071,32 @@ function updateProUI() {
     $('#pro-btn').classList.remove('is-pro');
     hint.textContent = t('proPitch');
   }
+  $('#restore-btn').hidden = isPro; // 已是 Pro 就不顯示恢復
+}
+
+async function onRestore() {
+  const email = (prompt(t('restorePrompt')) || '').trim();
+  if (!email) return;
+  try {
+    const r = await fetch(`${WORKER_BASE}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ installId: getInstallId(), email }),
+    });
+    const d = await r.json();
+    if (d.pro) {
+      isPro = true;
+      proUntil = d.until || null;
+      updateProUI();
+      alert(t('restoreFound'));
+    } else if (r.ok) {
+      alert(t('restoreNotFound'));
+    } else {
+      alert(t('restoreFailed'));
+    }
+  } catch {
+    alert(t('restoreFailed'));
+  }
 }
 
 async function checkEntitlement() {
@@ -2118,6 +2154,7 @@ async function handleProReturn() {
 langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
 
 $('#pro-btn').addEventListener('click', onProClick);
+$('#restore-btn').addEventListener('click', onRestore);
 
 $('#userkey-input').addEventListener('change', (e) => {
   const v = e.target.value.trim();
