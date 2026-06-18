@@ -308,6 +308,37 @@ const STRINGS = {
 // 預設語言為英文(對外銷售);使用者若曾手動選「中文」則尊重其選擇
 let lang = localStorage.getItem('lang') === 'zh' ? 'zh' : 'en';
 
+// ---------- 幣別 ----------
+// 內部一律以整數「分」(×100)儲存與計算;幣別只影響顯示符號與格式。
+// 預設馬幣;使用者可在設定改。常見幣別清單(Intl 會提供正確符號)。
+const CURRENCIES = [
+  { code: 'MYR', name: 'Malaysian Ringgit (RM)' },
+  { code: 'USD', name: 'US Dollar ($)' },
+  { code: 'EUR', name: 'Euro (€)' },
+  { code: 'GBP', name: 'British Pound (£)' },
+  { code: 'SGD', name: 'Singapore Dollar (S$)' },
+  { code: 'AUD', name: 'Australian Dollar (A$)' },
+  { code: 'CAD', name: 'Canadian Dollar (C$)' },
+  { code: 'CNY', name: 'Chinese Yuan (¥)' },
+  { code: 'HKD', name: 'Hong Kong Dollar (HK$)' },
+  { code: 'TWD', name: 'New Taiwan Dollar (NT$)' },
+  { code: 'JPY', name: 'Japanese Yen (¥)' },
+  { code: 'KRW', name: 'South Korean Won (₩)' },
+  { code: 'THB', name: 'Thai Baht (฿)' },
+  { code: 'IDR', name: 'Indonesian Rupiah (Rp)' },
+  { code: 'PHP', name: 'Philippine Peso (₱)' },
+  { code: 'VND', name: 'Vietnamese Dong (₫)' },
+  { code: 'INR', name: 'Indian Rupee (₹)' },
+  { code: 'NZD', name: 'New Zealand Dollar (NZ$)' },
+  { code: 'CHF', name: 'Swiss Franc (CHF)' },
+  { code: 'AED', name: 'UAE Dirham (د.إ)' },
+];
+const CURRENCY_CODES = new Set(CURRENCIES.map((c) => c.code));
+let currency = (() => {
+  const saved = localStorage.getItem('currency');
+  return saved && CURRENCY_CODES.has(saved) ? saved : 'MYR';
+})();
+
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 const APP_VERSION = 'v17';
 
@@ -317,14 +348,19 @@ function t(key, ...args) {
 }
 
 // ---------- 金額工具:儲存與計算全用整數「分」,只有顯示才轉換 ----------
-let myrFmt, dateFmt, monthFmt, shortDateFmt;
+let myrFmt, numFmt, dateFmt, monthFmt, shortDateFmt;
 
 function buildFormatters() {
   const locale = lang === 'en' ? 'en-MY' : 'zh-Hant';
   myrFmt = new Intl.NumberFormat(locale, {
     style: 'currency',
-    currency: 'MYR',
+    currency: currency,
     currencyDisplay: 'narrowSymbol',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  // 純數字(無符號)—— 給趨勢圖等只需要數字的地方用,避免硬寫死幣別符號
+  numFmt = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -350,6 +386,23 @@ export function formatRM(cents) {
     .map((p) => (p.type === 'currency' ? p.value + ' ' : p.value))
     .join('')
     .replace(/\s+/g, ' ');
+}
+
+// 純數字字串(無幣別符號)
+function formatNum(cents) {
+  return numFmt.format(cents / 100);
+}
+
+// 目前幣別的顯示符號(給輸入框前綴等用)
+function currencySymbol() {
+  const part = myrFmt.formatToParts(0).find((p) => p.type === 'currency');
+  return part ? part.value : currency;
+}
+
+// 把所有幣別前綴標籤(預算欄位等)更新成目前符號
+function updateCurrencyLabels() {
+  const sym = currencySymbol();
+  document.querySelectorAll('.budget-field-prefix').forEach((el) => { el.textContent = sym; });
 }
 
 // 鍵盤輸入字串 → 分(純字串/整數運算,不經過浮點加總)
@@ -567,7 +620,21 @@ function setLang(l) {
   renderCatList();
   if (detailCatId !== null) renderCatDetail();
   updateProUI();
+  updateCurrencyLabels();
   $('#cat-editor-title').textContent = editingCatId ? t('editCategory') : t('newCategory');
+}
+
+// 切換幣別:存偏好、重建格式器、更新標籤、重畫所有金額
+function setCurrency(code) {
+  if (!CURRENCY_CODES.has(code) || code === currency) return;
+  currency = code;
+  localStorage.setItem('currency', code);
+  buildFormatters();
+  updateCurrencyLabels();
+  renderList();
+  renderReport();
+  renderCatList();
+  if (detailCatId !== null) renderCatDetail();
 }
 
 // ---------- 明細列表 ----------
@@ -816,7 +883,7 @@ function renderTrend() {
     col.className = 'trend-col' + (mo.current ? ' current' : '');
     const h = mo.sum > 0 ? Math.max(4, (mo.sum / max) * 100) : 2;
     col.innerHTML = `
-      <span class="trend-val num">${mo.sum > 0 ? formatRM(mo.sum).replace(/^RM\s/, '') : ''}</span>
+      <span class="trend-val num">${mo.sum > 0 ? formatNum(mo.sum) : ''}</span>
       <span class="trend-bar-wrap"><span class="trend-bar" style="height:${h.toFixed(1)}%"></span></span>
       <span class="trend-month">${mo.m}</span>`;
     col.addEventListener('click', () => {
@@ -2303,6 +2370,7 @@ catDeleteBtn.addEventListener('click', onCatDelete);
 async function init() {
   buildFormatters();
   applyLanguage();
+  updateCurrencyLabels();
   $('#app-version').textContent = APP_VERSION;
 
   // 設了 PIN 就先鎖住(內容在鎖屏後面,不可見)
