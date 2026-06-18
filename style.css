@@ -1125,4 +1125,10 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .sync-warn { font-size: 12px; line-height: 1.5; color: var(--red); margin: 0 2px 16px; }
 .sync-secondary { margin-bottom: 10px; color: var(--gold); }
 
+/* 設定子頁 / 幣別清單 */
+.currency-row { text-align: left; }
+.currency-row.is-selected .cat-row-name { color: var(--gold); font-weight: 600; }
+.currency-check { width: 18px; text-align: center; color: var(--gold); font-size: 16px; font-weight: 700; }
+.settings-back { white-space: nowrap; }
+
 [hidden] { display: none !important; }

@@ -120,6 +120,15 @@ const STRINGS = {
     syncCopied: '已複製',
     syncCodeTooShort: '同步碼至少 8 碼',
     syncSavedWarn: '請先抄下或複製同步碼再離開——遺失將無法解密還原。',
+    budgetRecurringTitle: '預算與固定支出',
+    currencyTitle: '幣別',
+    currencyHint: '選擇顯示貨幣。金額不會換算匯率,只改變顯示的符號與格式。',
+    cloudTitle: 'Centsei Cloud',
+    cloudHubHint: '用 Centsei Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。',
+    aboutTitle: '關於',
+    syncEmailBackup: '把代碼 email 給我自己備份',
+    syncEmailSubject: 'Centsei Cloud 代碼(請妥善保存)',
+    syncEmailBody: (code) => `這是你的 Centsei Cloud 同步代碼,請妥善保存。\n換手機或重裝 App 時輸入它即可還原所有資料。\n\n代碼:${code}\n\n提醒:這組代碼是唯一的解密金鑰,遺失將無法還原,也請勿轉發他人。`,
     syncedAt: (n) => (n <= 0 ? '剛剛同步' : `${n} 分鐘前同步`),
     syncedHours: (n) => `${n} 小時前同步`,
     syncedDays: (n) => `${n} 天前同步`,
@@ -267,6 +276,15 @@ const STRINGS = {
     syncCopied: 'Copied',
     syncCodeTooShort: 'Sync code must be at least 8 characters',
     syncSavedWarn: 'Copy or write down your sync code first — if lost, the data cannot be decrypted.',
+    budgetRecurringTitle: 'Budget & Recurring',
+    currencyTitle: 'Currency',
+    currencyHint: 'Choose your display currency. Amounts are not converted by exchange rate — only the symbol and formatting change.',
+    cloudTitle: 'Centsei Cloud',
+    cloudHubHint: 'Use Centsei Cloud to sync across devices; your data survives deleting and reinstalling. End-to-end encrypted — only your code can unlock it.',
+    aboutTitle: 'About',
+    syncEmailBackup: 'Email this code to myself as a backup',
+    syncEmailSubject: 'Your Centsei Cloud code (keep it safe)',
+    syncEmailBody: (code) => `This is your Centsei Cloud sync code. Keep it safe.\nOn a new phone or after reinstalling, enter it to restore all your data.\n\nCode: ${code}\n\nNote: this code is the only key that decrypts your data. If lost, it cannot be recovered — and don't forward it to anyone.`,
     syncedAt: (n) => (n <= 0 ? 'Synced just now' : `Synced ${n} min ago`),
     syncedHours: (n) => `Synced ${n}h ago`,
     syncedDays: (n) => `Synced ${n}d ago`,
@@ -402,7 +420,7 @@ function currencySymbol() {
 // 把所有幣別前綴標籤(預算欄位等)更新成目前符號
 function updateCurrencyLabels() {
   const sym = currencySymbol();
-  document.querySelectorAll('.budget-field-prefix').forEach((el) => { el.textContent = sym; });
+  document.querySelectorAll('.budget-field-prefix, .amount-currency').forEach((el) => { el.textContent = sym; });
 }
 
 // 鍵盤輸入字串 → 分(純字串/整數運算,不經過浮點加總)
@@ -1150,14 +1168,77 @@ function openCatModal() {
   renderLockStatus();
   updateBackupStatus();
   updateSyncStatus();
+  renderCurrencyList();
+  updateSettingsHubStatuses();
   $('#userkey-input').value = localStorage.getItem('userAnthropicKey') || '';
   updateProUI();
   checkEntitlement();
+  showSettingsHub();          // 每次打開都回到主頁
   catModalEl.classList.add('open');
 }
 
 function closeCatModal() {
   catModalEl.classList.remove('open');
+  showSettingsHub();          // 關閉時重設,下次打開乾淨
+}
+
+// ---------- 設定:主頁 ↔ 子頁 導覽 ----------
+const settingsHubEl = $('#settings-hub');
+const settingsBackBtn = $('#settings-back');
+const settingsTitleEl = $('#settings-title');
+
+function showSettingsHub() {
+  settingsHubEl.hidden = false;
+  document.querySelectorAll('#cat-modal .settings-page').forEach((p) => { p.hidden = true; });
+  settingsBackBtn.style.visibility = 'hidden';
+  settingsTitleEl.textContent = t('settings');
+  settingsTitleEl.setAttribute('data-i18n', 'settings');
+}
+
+function showSettingsPage(page, titleKey) {
+  settingsHubEl.hidden = true;
+  document.querySelectorAll('#cat-modal .settings-page').forEach((p) => {
+    p.hidden = p.dataset.page !== page;
+  });
+  settingsBackBtn.style.visibility = 'visible';
+  settingsTitleEl.textContent = titleKey ? t(titleKey) : '';
+  if (titleKey) settingsTitleEl.setAttribute('data-i18n', titleKey);
+  else settingsTitleEl.removeAttribute('data-i18n');
+  catModalEl.scrollTop = 0;
+}
+
+document.querySelectorAll('#settings-hub .settings-row').forEach((row) => {
+  row.addEventListener('click', () => showSettingsPage(row.dataset.page, row.dataset.titleKey));
+});
+settingsBackBtn.addEventListener('click', showSettingsHub);
+
+// 主頁各列右側的小狀態(目前幣別、是否開同步、是否設鎖)
+function updateSettingsHubStatuses() {
+  const cur = CURRENCIES.find((c) => c.code === currency);
+  $('#currency-current').textContent = cur ? currency : '';
+  const cloudEl = $('#cloud-hub-status');
+  if (cloudEl) cloudEl.textContent = syncCode ? t('syncOn') : '';
+  const lockEl = $('#lock-hub-status');
+  if (lockEl) lockEl.textContent = pinIsSet() ? t('syncOn') : '';
+}
+
+// ---------- 幣別清單 ----------
+function renderCurrencyList() {
+  const wrap = $('#currency-list');
+  if (!wrap) return;
+  wrap.innerHTML = '';
+  CURRENCIES.forEach((c) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'cat-row currency-row' + (c.code === currency ? ' is-selected' : '');
+    row.innerHTML = `<span class="cat-row-name">${c.name}</span><span class="currency-check">${c.code === currency ? '✓' : ''}</span>`;
+    row.addEventListener('click', () => {
+      setCurrency(c.code);
+      renderCurrencyList();
+      updateSettingsHubStatuses();
+    });
+    wrap.appendChild(row);
+  });
 }
 
 // ---------- 分類編輯器 ----------
@@ -2346,6 +2427,14 @@ $('#sync-copy').addEventListener('click', async () => {
   const b = $('#sync-copy');
   b.textContent = t('syncCopied');
   setTimeout(() => { b.textContent = t('syncCopy'); }, 1500);
+});
+$('#sync-email-backup').addEventListener('click', () => {
+  // 把代碼用 email 寄給自己備份:純 mailto,代碼不經過我們的伺服器,維持端到端加密
+  const code = (syncCodeInput.value || syncCode || '').trim().toUpperCase();
+  if (code.length < 8) { alert(t('syncCodeTooShort')); return; }
+  const subject = encodeURIComponent(t('syncEmailSubject'));
+  const body = encodeURIComponent(t('syncEmailBody', code));
+  window.location.href = `mailto:?subject=${subject}&body=${body}`;
 });
 $('#sync-disable').addEventListener('click', () => {
   if (confirm(t('syncDisableConfirm'))) { disableSync(); closeSyncSheet(); }
