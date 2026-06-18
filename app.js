@@ -126,6 +126,13 @@ const STRINGS = {
     cloudTitle: 'Centsei Cloud',
     cloudHubHint: '用 Centsei Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。',
     aboutTitle: '關於',
+    faceUnlockTitle: '用 Face ID 解鎖',
+    faceUnlockTitleTouch: '用 Touch ID 解鎖',
+    faceUnlockHint: '開啟後,打開 App 時可用 Face ID 解鎖;失敗或取消時仍可輸入 PIN。',
+    faceUnlockReason: '解鎖 Centsei',
+    faceUnlockNeedPin: '請先設定 PIN 碼,才能開啟生物辨識解鎖。',
+    useFaceIDBtn: '使用 Face ID',
+    useTouchIDBtn: '使用 Touch ID',
     syncEmailBackup: '把代碼 email 給我自己備份',
     syncEmailSubject: 'Centsei Cloud 代碼(請妥善保存)',
     syncEmailBody: (code) => `這是你的 Centsei Cloud 同步代碼,請妥善保存。\n換手機或重裝 App 時輸入它即可還原所有資料。\n\n代碼:${code}\n\n提醒:這組代碼是唯一的解密金鑰,遺失將無法還原,也請勿轉發他人。`,
@@ -282,6 +289,13 @@ const STRINGS = {
     cloudTitle: 'Centsei Cloud',
     cloudHubHint: 'Use Centsei Cloud to sync across devices; your data survives deleting and reinstalling. End-to-end encrypted — only your code can unlock it.',
     aboutTitle: 'About',
+    faceUnlockTitle: 'Unlock with Face ID',
+    faceUnlockTitleTouch: 'Unlock with Touch ID',
+    faceUnlockHint: 'When on, you can unlock the app with Face ID; your PIN still works if it fails or is cancelled.',
+    faceUnlockReason: 'Unlock Centsei',
+    faceUnlockNeedPin: 'Set a PIN first to enable biometric unlock.',
+    useFaceIDBtn: 'Use Face ID',
+    useTouchIDBtn: 'Use Touch ID',
     syncEmailBackup: 'Email this code to myself as a backup',
     syncEmailSubject: 'Your Centsei Cloud code (keep it safe)',
     syncEmailBody: (code) => `This is your Centsei Cloud sync code. Keep it safe.\nOn a new phone or after reinstalling, enter it to restore all your data.\n\nCode: ${code}\n\nNote: this code is the only key that decrypts your data. If lost, it cannot be recovered — and don't forward it to anyone.`,
@@ -1781,7 +1795,10 @@ function showLock(mode) {
   if (mode === 'set-new') firstPin = '';
   setLockTitle();
   renderLockDots();
+  const faceBtn = lockScreenEl.querySelector('#lock-face-btn');
+  if (faceBtn) faceBtn.hidden = true;
   lockScreenEl.hidden = false;
+  if (mode === 'unlock') maybeOfferBiometric();
 }
 
 function hideLock() {
@@ -1838,6 +1855,8 @@ function lockPress(key) {
 
 function renderLockStatus() {
   lockStatusEl.textContent = pinIsSet() ? t('lockStatusOn') : t('lockStatusOff');
+  if (BiometricAuth) refreshBiometry().then(renderFaceUnlockRow);
+  else renderFaceUnlockRow();
 }
 
 function onLockRowClick() {
@@ -1846,11 +1865,71 @@ function onLockRowClick() {
       localStorage.removeItem('pinHash');
       localStorage.removeItem('pinSalt');
       localStorage.removeItem('pinLen');
+      localStorage.removeItem('faceUnlock');   // 移除 PIN 一併關閉生物辨識
       renderLockStatus();
     }
   } else {
     showLock('set-new');
   }
+}
+
+// ---------- 生物辨識解鎖(Face ID / Touch ID,僅原生 App)----------
+// 透過原生外掛 BiometricAuthNative 的原始 proxy 取得(免打包工具);Web 版為 null。
+const BiometricAuth = (IS_NATIVE && window.Capacitor && window.Capacitor.registerPlugin)
+  ? window.Capacitor.registerPlugin('BiometricAuthNative') : null;
+let biometryInfo = { isAvailable: false, biometryType: 0 };  // 1=Touch ID, 2=Face ID
+
+async function refreshBiometry() {
+  if (!BiometricAuth) { biometryInfo = { isAvailable: false, biometryType: 0 }; return biometryInfo; }
+  try { biometryInfo = await BiometricAuth.checkBiometry(); }
+  catch { biometryInfo = { isAvailable: false, biometryType: 0 }; }
+  return biometryInfo;
+}
+
+const faceUnlockEnabled = () => pinIsSet() && localStorage.getItem('faceUnlock') === '1';
+
+async function tryBiometricUnlock() {
+  if (!BiometricAuth || !faceUnlockEnabled()) return false;
+  try {
+    const info = await refreshBiometry();
+    if (!info.isAvailable) return false;
+    await BiometricAuth.internalAuthenticate({ reason: t('faceUnlockReason'), cancelTitle: t('cancel'), iosFallbackTitle: '' });
+    return true;   // 驗證成功
+  } catch { return false; }  // 取消或失敗 → 退回 PIN
+}
+
+// 鎖屏(unlock 模式)時:顯示「使用 Face ID」按鈕並自動嘗試一次
+async function maybeOfferBiometric() {
+  const faceBtn = lockScreenEl.querySelector('#lock-face-btn');
+  if (!BiometricAuth || !faceUnlockEnabled()) { if (faceBtn) faceBtn.hidden = true; return; }
+  const info = await refreshBiometry();
+  if (!info.isAvailable) { if (faceBtn) faceBtn.hidden = true; return; }
+  if (faceBtn) {
+    faceBtn.hidden = false;
+    faceBtn.textContent = info.biometryType === 1 ? t('useTouchIDBtn') : t('useFaceIDBtn');
+  }
+  if (await tryBiometricUnlock()) hideLock();
+}
+
+// 設定 → App 鎖:生物辨識開關列(只在原生+可用+已設 PIN 顯示)
+function renderFaceUnlockRow() {
+  const block = $('#face-unlock-block');
+  const hint = $('#face-unlock-hint');
+  if (!block) return;
+  const show = !!BiometricAuth && biometryInfo.isAvailable && pinIsSet();
+  block.hidden = !show;
+  if (hint) hint.hidden = !show;
+  if (!show) return;
+  const isTouch = biometryInfo.biometryType === 1;
+  $('#face-unlock-name').textContent = t(isTouch ? 'faceUnlockTitleTouch' : 'faceUnlockTitle');
+  $('#face-unlock-status').textContent = localStorage.getItem('faceUnlock') === '1' ? t('syncOn') : t('syncOff');
+}
+
+function onFaceUnlockClick() {
+  if (!pinIsSet()) { alert(t('faceUnlockNeedPin')); return; }
+  if (localStorage.getItem('faceUnlock') === '1') localStorage.removeItem('faceUnlock');
+  else localStorage.setItem('faceUnlock', '1');
+  renderFaceUnlockRow();
 }
 
 // ---------- 雲端同步(端到端加密) ----------
@@ -2447,6 +2526,10 @@ lockScreenEl.querySelectorAll('.lock-key').forEach((btn) =>
   btn.addEventListener('click', () => lockPress(btn.dataset.key))
 );
 $('#lock-done').addEventListener('click', lockSubmit);
+$('#face-unlock-row').addEventListener('click', onFaceUnlockClick);
+lockScreenEl.querySelector('#lock-face-btn').addEventListener('click', async () => {
+  if (await tryBiometricUnlock()) hideLock();
+});
 
 $('#detail-back-btn').addEventListener('click', closeCatDetail);
 

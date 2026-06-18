@@ -278,6 +278,15 @@
         </button>
       </div>
       <p class="backup-hint" data-i18n="lockHint">開啟後每次打開 App 需輸入 PIN(僅存在本機,不含在備份中)。</p>
+      <div id="face-unlock-block" class="cat-list" hidden>
+        <button id="face-unlock-row" class="cat-row" type="button">
+          <svg class="row-icon" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.7"/><path d="M8 9v1M16 9v1M9 15s1 1.5 3 1.5S15 15 15 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="cat-row-name" id="face-unlock-name" data-i18n="faceUnlockTitle">用 Face ID 解鎖</span>
+          <span id="face-unlock-status" class="cat-row-count"></span>
+          <span class="cat-row-chevron">›</span>
+        </button>
+      </div>
+      <p class="backup-hint" id="face-unlock-hint" data-i18n="faceUnlockHint" hidden>開啟後,打開 App 時可用 Face ID 解鎖;失敗或取消時仍可輸入 PIN。</p>
     </div>
 
     <!-- 子頁:資料備份 -->
@@ -426,6 +435,7 @@
         <button class="key lock-key" data-key="0" type="button">0</button>
         <button class="key lock-key key-del" data-key="del" type="button">⌫</button>
       </div>
+      <button id="lock-face-btn" class="lock-face-btn" type="button" hidden></button>
       <button id="lock-done" class="save-btn lock-done" type="button" data-i18n="done" hidden>完成</button>
     </div>
   </div>

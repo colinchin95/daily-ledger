@@ -1131,4 +1131,16 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .currency-check { width: 18px; text-align: center; color: var(--gold); font-size: 16px; font-weight: 700; }
 .settings-back { white-space: nowrap; }
 
+/* 鎖屏:Face ID / Touch ID 按鈕 */
+.lock-face-btn {
+  margin-top: 18px;
+  background: none;
+  border: none;
+  color: var(--gold);
+  font-size: 16px;
+  font-weight: 600;
+  padding: 8px 16px;
+}
+.lock-face-btn:active { opacity: 0.6; }
+
 [hidden] { display: none !important; }
