@@ -1,18 +1,30 @@
 import {
   getEntries, saveEntries, getCategories, saveCategories,
   getMeta, saveMeta, getRecurring, saveRecurring,
+  getAccounts, saveAccounts,
 } from './db.js';
+import { moneyRain, moneyBurn } from './entry-fx.js';
+import { parseCsv, reconcile, parseWithAI } from './reconcile.js';
 
 // 是否執行在原生 App(Capacitor / iOS 包裝版)殼層內。
 // iOS 上 Apple 規定數位內容只能用內購,不能用外部金流 → 隱藏 Pro 購買入口,
 // 只保留「恢復購買」(允許啟用在外部已購買的內容)。
-const IS_NATIVE = !!(window.Capacitor?.isNativePlatform?.());
+// 加固偵測:Capacitor 全域有時在模組執行時尚未就緒,改用「協定/平台」多重判斷。
+// iOS 殼層一律走 capacitor:// scheme;Android 走 https://localhost。任一成立即為原生。
+const IS_NATIVE = !!(
+  window.Capacitor?.isNativePlatform?.() ||
+  window.Capacitor?.getPlatform?.() === 'ios' ||
+  window.Capacitor?.getPlatform?.() === 'android' ||
+  location.protocol === 'capacitor:' ||
+  location.protocol === 'ionic:' ||
+  (location.protocol === 'https:' && location.hostname === 'localhost')
+);
 if (IS_NATIVE) document.documentElement.classList.add('is-native');
 
 // ---------- 多語系 ----------
 const STRINGS = {
   zh: {
-    appTitle: 'Centsei',
+    appTitle: 'RichMama',
     categories: '分類',
     done: '完成',
     cancel: '取消',
@@ -104,7 +116,7 @@ const STRINGS = {
     lastBackup: (n) => `上次備份:${n} 天前`,
     lastBackupToday: '上次備份:今天',
     lastBackupNever: '尚未備份',
-    shareTitle: 'Centsei 備份',
+    shareTitle: 'RichMama 備份',
     // 雲端同步
     syncSection: '雲端同步',
     syncOn: '已開啟',
@@ -123,19 +135,19 @@ const STRINGS = {
     budgetRecurringTitle: '預算與固定支出',
     currencyTitle: '幣別',
     currencyHint: '選擇顯示貨幣。金額不會換算匯率,只改變顯示的符號與格式。',
-    cloudTitle: 'Centsei Cloud',
-    cloudHubHint: '用 Centsei Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。',
+    cloudTitle: 'RichMama Cloud',
+    cloudHubHint: '用 RichMama Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。',
     aboutTitle: '關於',
     faceUnlockTitle: '用 Face ID 解鎖',
     faceUnlockTitleTouch: '用 Touch ID 解鎖',
     faceUnlockHint: '開啟後,打開 App 時可用 Face ID 解鎖;失敗或取消時仍可輸入 PIN。',
-    faceUnlockReason: '解鎖 Centsei',
+    faceUnlockReason: '解鎖 RichMama',
     faceUnlockNeedPin: '請先設定 PIN 碼,才能開啟生物辨識解鎖。',
     useFaceIDBtn: '使用 Face ID',
     useTouchIDBtn: '使用 Touch ID',
     syncEmailBackup: '把代碼 email 給我自己備份',
-    syncEmailSubject: 'Centsei Cloud 代碼(請妥善保存)',
-    syncEmailBody: (code) => `這是你的 Centsei Cloud 同步代碼,請妥善保存。\n換手機或重裝 App 時輸入它即可還原所有資料。\n\n代碼:${code}\n\n提醒:這組代碼是唯一的解密金鑰,遺失將無法還原,也請勿轉發他人。`,
+    syncEmailSubject: 'RichMama Cloud 代碼(請妥善保存)',
+    syncEmailBody: (code) => `這是你的 RichMama Cloud 同步代碼,請妥善保存。\n換手機或重裝 App 時輸入它即可還原所有資料。\n\n代碼:${code}\n\n提醒:這組代碼是唯一的解密金鑰,遺失將無法還原,也請勿轉發他人。`,
     syncedAt: (n) => (n <= 0 ? '剛剛同步' : `${n} 分鐘前同步`),
     syncedHours: (n) => `${n} 小時前同步`,
     syncedDays: (n) => `${n} 天前同步`,
@@ -144,18 +156,47 @@ const STRINGS = {
     syncDisableConfirm: '停止同步?資料仍留在這台裝置,但不再上傳/下載。',
     // 收據辨識
     scanReceipt: '掃描收據',
+    importStatement: '匯入銀行 / 信用卡對帳單',
+    planAnnual: '年繳',
+    planMonthly: '月繳',
+    planWeekly: '週繳',
+    unitWeek: '週',
+    unitMonth: '月',
+    unitYear: '年',
+    aiConsentReceipt: '掃描收據會把這張照片經加密連線送到我們的處理端點,再交由 Anthropic (Claude) 辨識金額、日期與商家。照片不會被儲存,也不會用於訓練模型。要繼續嗎?',
+    aiConsentStatement: '匯入對帳單會把這份檔案經加密連線送到我們的處理端點,再交由 Anthropic (Claude) 解析出交易明細。檔案不會被儲存,也不會用於訓練模型。要繼續嗎?',
+    planBest: '最划算',
+    planSave: (pct) => `比月繳省 ${pct}%`,
+ // 斜線前後留空,讓它斷在這裡而不是把「單」擠成孤字
+    reconcileTitle: '月結對帳',
+    reconBusy: '讀取中…',
+    reconMatched: '已記錄',
+    reconReview: '待確認',
+    reconMissing: '漏記',
+    reconCredit: '退款',
+    reconAdd: '補記',
+    reconAddAll: (n) => `補記 ${n} 筆`,
+    reconSummary: (total, matched, add) => `${total} 筆交易 · ${matched} 筆已記錄 · ${add} 筆待補`,
+    reconOtherCard: (n) => `另有 ${n} 筆非本卡消費`,
+    reconEmpty: '這份檔案裡找不到交易明細。',
+    reconFailed: '對帳單辨識失敗。如果是加密的 PDF,請先開啟後截圖,或改用銀行匯出的 CSV。',
+    reconQuota: '本月對帳額度已用完。升級 Pro 可每月對帳 12 份。',
+    reconQuotaNative: '本月對帳額度已用完。若你已購買 Pro,點「恢復購買」即可繼續使用。',
     scanningReceipt: '辨識中…',
     receiptFailed: '收據辨識失敗,請改用手動輸入。',
     receiptQuota: (n) => `本月免費掃描已用完(${n} 張)。升級 Pro 即可無限掃描,或先手動記帳。`,
     proPitch: '升級 Pro:每張收據拍照,AI 幫你自動填好金額、日期、商家、分類——省下手動輸入的麻煩,想拍多少就拍多少。免費版每月 5 張。',
-    proThanks: '感謝支持 Centsei 💛 你的收據掃描現在無限使用。',
+    proThanks: '感謝支持 RichMama 💛 你的收據掃描現在無限使用。',
     proNativeHint: '收據掃描是 Pro 功能。若你已在其他平台購買,點下方「恢復購買」即可啟用。',
     receiptQuotaNative: '本月免費掃描已用完。請先手動記帳;若你已購買 Pro,點「恢復購買」即可無限使用。',
     receiptRate: '掃描太頻繁,請稍後再試。',
     receiptBusy: '伺服器忙碌中,請稍後再試。',
-    byoKeyInvalid: '你的 Anthropic 金鑰無效,請檢查後重試。',
     receiptSection: '收據辨識',
-    upgradePro: '升級 Pro(US$2.99/月,無限掃描)',
+    upgradePro: '升級 Pro',
+    upgradeProPrice: (p) => `升級 Pro — ${p}/月`,
+    upgradeProGeneric: '訂閱 Pro',
+    proPitchIAP: (p) => `Pro:移除廣告,收據掃描與對帳單匯入無限使用。自動續訂訂閱,透過你的 Apple ID 收費;每${p}自動續訂,除非在當期結束前 24 小時取消。可隨時在 iOS「設定」中管理或取消。`,
+    proPitchIAPAndroid: (p) => `Pro:移除廣告,收據掃描與對帳單匯入無限使用。自動續訂訂閱,透過 Google Play 收費;每${p}自動續訂,除非在當期結束前取消。可隨時在 Google Play「訂閱」中管理或取消。`,
     proActive: 'Pro 已啟用',
     proUntil: (d) => `至 ${d}`,
     proWelcome: '已升級 Pro!收據掃描現在無限使用。',
@@ -165,15 +206,31 @@ const STRINGS = {
     restoreFound: 'Pro 已恢復!',
     restoreNotFound: '找不到使用該 Email 的有效訂閱。',
     restoreFailed: '恢復失敗,請稍後再試。',
-    byoPlaceholder: 'sk-ant-…(自備金鑰,可空)',
-    byoHint: '貼上你自己的 Anthropic 金鑰 → 收據掃描無限、不佔免費額度(金鑰只存在本機,不含在備份)。留空則使用免費額度(每月 5 張)。',
     legalSection: '法律',
     privacyPolicy: '隱私政策',
     termsOfService: '服務條款',
+    accountsSection: '帳戶',
+    accountsHint: '收入與支出可分別記入不同帳戶;餘額 = 期初餘額 + 收入 − 支出。',
+    accountName: '帳戶名稱',
+    newAccount: '新增帳戶',
+    editAccount: '編輯帳戶',
+    deleteAccount: '刪除帳戶',
+    confirmDeleteAccount: (n) => `刪除此帳戶?${n} 筆帳目會移到你的第一個帳戶。`,
+    lastAccountNoDelete: '至少要保留一個帳戶。',
+    openingBalance: '期初餘額(可空)',
+    netWorth: '總資產',
+    accountsTitle: '帳戶餘額',
+    avgPerDay: '日均支出',
+    avgPerDayIncome: '日均收入',
+    vsLastMonth: '較上月',
+    vsSamePeriod: '較上月同期',
+    topSpend: '最大單筆',
+    dailyTitle: '每日支出',
+    dailyTitleIncome: '每日收入',
     langBtn: 'EN',
   },
   en: {
-    appTitle: 'Centsei',
+    appTitle: 'RichMama',
     categories: 'Categories',
     done: 'Done',
     cancel: 'Cancel',
@@ -267,7 +324,7 @@ const STRINGS = {
     lastBackup: (n) => `Last backup: ${n} day${n === 1 ? '' : 's'} ago`,
     lastBackupToday: 'Last backup: today',
     lastBackupNever: 'Never backed up',
-    shareTitle: 'Centsei backup',
+    shareTitle: 'RichMama backup',
     // Cloud sync
     syncSection: 'Cloud Sync',
     syncOn: 'On',
@@ -286,19 +343,19 @@ const STRINGS = {
     budgetRecurringTitle: 'Budget & Recurring',
     currencyTitle: 'Currency',
     currencyHint: 'Choose your display currency. Amounts are not converted by exchange rate — only the symbol and formatting change.',
-    cloudTitle: 'Centsei Cloud',
-    cloudHubHint: 'Use Centsei Cloud to sync across devices; your data survives deleting and reinstalling. End-to-end encrypted — only your code can unlock it.',
+    cloudTitle: 'RichMama Cloud',
+    cloudHubHint: 'Use RichMama Cloud to sync across devices; your data survives deleting and reinstalling. End-to-end encrypted — only your code can unlock it.',
     aboutTitle: 'About',
     faceUnlockTitle: 'Unlock with Face ID',
     faceUnlockTitleTouch: 'Unlock with Touch ID',
     faceUnlockHint: 'When on, you can unlock the app with Face ID; your PIN still works if it fails or is cancelled.',
-    faceUnlockReason: 'Unlock Centsei',
+    faceUnlockReason: 'Unlock RichMama',
     faceUnlockNeedPin: 'Set a PIN first to enable biometric unlock.',
     useFaceIDBtn: 'Use Face ID',
     useTouchIDBtn: 'Use Touch ID',
     syncEmailBackup: 'Email this code to myself as a backup',
-    syncEmailSubject: 'Your Centsei Cloud code (keep it safe)',
-    syncEmailBody: (code) => `This is your Centsei Cloud sync code. Keep it safe.\nOn a new phone or after reinstalling, enter it to restore all your data.\n\nCode: ${code}\n\nNote: this code is the only key that decrypts your data. If lost, it cannot be recovered — and don't forward it to anyone.`,
+    syncEmailSubject: 'Your RichMama Cloud code (keep it safe)',
+    syncEmailBody: (code) => `This is your RichMama Cloud sync code. Keep it safe.\nOn a new phone or after reinstalling, enter it to restore all your data.\n\nCode: ${code}\n\nNote: this code is the only key that decrypts your data. If lost, it cannot be recovered — and don't forward it to anyone.`,
     syncedAt: (n) => (n <= 0 ? 'Synced just now' : `Synced ${n} min ago`),
     syncedHours: (n) => `Synced ${n}h ago`,
     syncedDays: (n) => `Synced ${n}d ago`,
@@ -307,18 +364,47 @@ const STRINGS = {
     syncDisableConfirm: 'Stop syncing? Data stays on this device but no longer uploads/downloads.',
     // Receipt scanning
     scanReceipt: 'Scan receipt',
+    importStatement: 'Import Bank / Credit card statement',
+    planAnnual: 'Yearly',
+    planMonthly: 'Monthly',
+    planWeekly: 'Weekly',
+    unitWeek: 'week',
+    unitMonth: 'month',
+    unitYear: 'year',
+    aiConsentReceipt: 'Scanning a receipt sends this photo over an encrypted connection to our processing endpoint, then on to Anthropic (Claude) to read the amount, date and merchant. The image is not stored and is not used to train models. Continue?',
+    aiConsentStatement: 'Importing a statement sends this file over an encrypted connection to our processing endpoint, then on to Anthropic (Claude) to extract the transactions. The file is not stored and is not used to train models. Continue?',
+    planBest: 'Best value',
+    planSave: (pct) => `Save ${pct}% vs monthly`,
+
+    reconcileTitle: 'Statement reconcile',
+    reconBusy: 'Reading…',
+    reconMatched: 'Recorded',
+    reconReview: 'Check',
+    reconMissing: 'Missing',
+    reconCredit: 'Refund',
+    reconAdd: 'Add',
+    reconAddAll: (n) => `Add ${n}`,
+    reconSummary: (total, matched, add) => `${total} transactions · ${matched} recorded · ${add} to add`,
+    reconOtherCard: (n) => `${n} more not on this card`,
+    reconEmpty: "Couldn't find any transactions in that file.",
+    reconFailed: "Couldn't read the statement. If the PDF is password-protected, open it and take a screenshot, or export a CSV from your bank instead.",
+    reconQuota: "You've used this month's reconcile quota. Pro includes 12 statements a month.",
+    reconQuotaNative: "You've used this month's reconcile quota. If you already have Pro, tap “Restore purchase”.",
     scanningReceipt: 'Scanning…',
     receiptFailed: "Couldn't read the receipt — please enter manually.",
     receiptQuota: (n) => `You've used all ${n} free scans this month. Upgrade to Pro for unlimited, or add it manually.`,
     proPitch: 'Go Pro: snap any receipt and AI auto-fills the amount, date, merchant, and category — no more typing, scan as much as you want. Free plan includes 5 scans a month.',
-    proThanks: 'Thanks for supporting Centsei 💛 Your receipt scanning is now unlimited.',
+    proThanks: 'Thanks for supporting RichMama 💛 Your receipt scanning is now unlimited.',
     proNativeHint: 'Receipt scanning is a Pro feature. Already purchased elsewhere? Tap “Restore purchase” below to activate.',
     receiptQuotaNative: 'You’ve used all your free scans this month. Add entries manually, or tap “Restore purchase” if you already have Pro.',
     receiptRate: 'Too many scans right now — please try again shortly.',
     receiptBusy: 'The server is busy — please try again later.',
-    byoKeyInvalid: 'Your Anthropic key is invalid — please check and try again.',
     receiptSection: 'Receipt scanning',
-    upgradePro: 'Upgrade to Pro (US$2.99/mo, unlimited)',
+    upgradePro: 'Upgrade to Pro',
+    upgradeProPrice: (p) => `Upgrade to Pro — ${p}/mo`,
+    upgradeProGeneric: 'Subscribe to Pro',
+    proPitchIAP: (p) => `Pro removes ads and unlocks unlimited receipt scanning and statement import. Auto-renewable subscription billed to your Apple ID; renews every ${p} unless cancelled at least 24 hours before the period ends. Manage or cancel anytime in iOS Settings.`,
+    proPitchIAPAndroid: (p) => `Pro removes ads and unlocks unlimited receipt scanning and statement import. Auto-renewable subscription billed through Google Play; renews every ${p} unless cancelled before the period ends. Manage or cancel anytime in Google Play Subscriptions.`,
     proActive: 'Pro active',
     proUntil: (d) => `until ${d}`,
     proWelcome: "You're Pro! Receipt scanning is now unlimited.",
@@ -328,11 +414,27 @@ const STRINGS = {
     restoreFound: 'Pro restored!',
     restoreNotFound: 'No active subscription found for that email.',
     restoreFailed: 'Restore failed — please try again.',
-    byoPlaceholder: 'sk-ant-… (your own key, optional)',
-    byoHint: "Paste your own Anthropic key → unlimited scans that don't use the free quota (stored on this device only, never in backups). Leave empty to use the free quota (5/month).",
     legalSection: 'Legal',
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
+    accountsSection: 'Accounts',
+    accountsHint: 'Route income and expenses to different accounts; balance = opening balance + income − expenses.',
+    accountName: 'Account name',
+    newAccount: 'New account',
+    editAccount: 'Edit account',
+    deleteAccount: 'Delete account',
+    confirmDeleteAccount: (n) => `Delete this account? ${n} entries will move to your first account.`,
+    lastAccountNoDelete: 'You need at least one account.',
+    openingBalance: 'Opening balance (optional)',
+    netWorth: 'Net worth',
+    accountsTitle: 'Account balances',
+    avgPerDay: 'Avg / day',
+    avgPerDayIncome: 'Avg / day',
+    vsLastMonth: 'vs last month',
+    vsSamePeriod: 'vs same period',
+    topSpend: 'Biggest expense',
+    dailyTitle: 'Daily spending',
+    dailyTitleIncome: 'Daily income',
     langBtn: '中文',
   },
 };
@@ -486,10 +588,12 @@ let entries = [];
 let categories = [];
 let meta = {};          // { monthlyBudgetCents }
 let recurring = [];     // 固定支出範本
+let accounts = [];      // 帳戶 { id, name, color, openingCents, renamed? }
 let searchQuery = '';   // 明細搜尋字串
 
 let amountStr = '';
 let selectedCatId = null;
+let selectedAcctId = null;
 let editingId = null;        // null = 新增模式
 let sheetType = 'expense';   // 記帳面板:支出/收入
 
@@ -506,10 +610,11 @@ let editingRecurId = null;     // null = 新增
 let recurType = 'expense';
 let recurCatId = null;
 
+// 低飽和寶石色盤,與香檳/金/酒紅主題同調
 const PALETTE = [
-  '#E8A33D', '#EDC75A', '#E06C5B', '#FF8FA3', '#D96BA0', '#C77DBA',
-  '#9B7BD8', '#6E8BE0', '#4FA3E0', '#58B7D4', '#5BBFA8', '#6BCB8F',
-  '#A8C95B', '#C4A484', '#8C95A3', '#C9CCD4',
+  '#C69A4E', '#B5763C', '#A6452F', '#8E2A20', '#B4697A', '#96577E',
+  '#75618F', '#566B96', '#3E7C8A', '#4E8C7B', '#6E8B4A', '#96A050',
+  '#B79A62', '#9B7E68', '#8A8078', '#B3A99C',
 ];
 
 // ---------- DOM ----------
@@ -621,6 +726,39 @@ function catName(cat) {
   const builtin = CATEGORY_NAMES[cat.id];
   if (builtin && !cat.renamed) return builtin[lang === 'en' ? 'en' : 'zh'];
   return cat.name;
+}
+
+// 內建帳戶名稱跟語言走;改過名(renamed=true)用自訂名
+const ACCOUNT_NAMES = {
+  cash: { zh: '現金', en: 'Cash' },
+  bank: { zh: '銀行', en: 'Bank' },
+};
+
+const acctMap = () => new Map(accounts.map((a) => [a.id, a]));
+
+function acctName(a) {
+  if (!a) return '';
+  const builtin = ACCOUNT_NAMES[a.id];
+  if (builtin && !a.renamed) return builtin[lang === 'en' ? 'en' : 'zh'];
+  return a.name;
+}
+
+// 帳戶目前餘額 = 期初 + 全部收入 − 全部支出(沒 accountId 的舊帳目歸第一個帳戶)
+function acctBalance(a) {
+  const fallback = accounts[0]?.id;
+  let cents = a.openingCents || 0;
+  for (const e of entries) {
+    const aid = e.accountId || fallback;
+    if (aid !== a.id) continue;
+    cents += e.type === 'income' ? e.amountCents : -e.amountCents;
+  }
+  return cents;
+}
+
+function defaultAcctId() {
+  const last = localStorage.getItem('lastAccountId');
+  if (last && accounts.some((a) => a.id === last)) return last;
+  return accounts[0]?.id ?? null;
 }
 
 function setSegActive(segEl, type) {
@@ -753,6 +891,15 @@ function renderList() {
       <span class="entry-amount"></span>`;
     card.querySelector('.cat-dot').style.background = cat?.color ?? '#8C95A3';
     card.querySelector('.entry-cat').textContent = catName(cat);
+    if (accounts.length > 1) {
+      const acct = acctMap().get(entry.accountId || accounts[0]?.id);
+      if (acct) {
+        const tag = document.createElement('span');
+        tag.className = 'entry-acct';
+        tag.textContent = acctName(acct);
+        card.querySelector('.entry-cat').after(tag);
+      }
+    }
     if (entry.note) {
       const noteEl = card.querySelector('.entry-note');
       noteEl.textContent = entry.note;
@@ -789,6 +936,9 @@ function renderReport() {
   reportBalanceEl.classList.toggle('negative-text', balance < 0);
 
   renderBudgetCard(expense);
+  renderAccountsCard();
+  renderInsights(key, monthEntries);
+  renderDaily(key, monthEntries);
   renderTrend();
 
   // 各分類佔比
@@ -883,6 +1033,138 @@ function renderBudgetCard(monthExpense) {
   const foot = budgetCardEl.querySelector('.budget-foot');
   foot.textContent = remaining >= 0 ? t('budgetLeft', formatRM(remaining)) : t('budgetOver', formatRM(-remaining));
   foot.style.color = color;
+}
+
+// ---------- 帳戶餘額卡 ----------
+function renderAccountsCard() {
+  const card = $('#accounts-card');
+  card.innerHTML = '';
+  const title = document.createElement('div');
+  title.className = 'trend-title';
+  title.textContent = t('accountsTitle');
+  card.appendChild(title);
+
+  let total = 0;
+  for (const a of accounts) {
+    const bal = acctBalance(a);
+    total += bal;
+    const row = document.createElement('div');
+    row.className = 'acct-bal-row';
+    row.innerHTML = `<span class="cat-dot"></span><span class="acct-bal-name"></span><span class="acct-bal-amt num"></span>`;
+    row.querySelector('.cat-dot').style.background = a.color;
+    row.querySelector('.acct-bal-name').textContent = acctName(a);
+    const amt = row.querySelector('.acct-bal-amt');
+    amt.textContent = formatRM(bal);
+    if (bal < 0) amt.classList.add('negative-text');
+    card.appendChild(row);
+  }
+  const totalRow = document.createElement('div');
+  totalRow.className = 'acct-bal-row acct-bal-total';
+  totalRow.innerHTML = `<span class="acct-bal-name"></span><span class="acct-bal-amt num"></span>`;
+  totalRow.querySelector('.acct-bal-name').textContent = t('netWorth');
+  const totalAmt = totalRow.querySelector('.acct-bal-amt');
+  totalAmt.textContent = formatRM(total);
+  totalAmt.classList.toggle('negative-text', total < 0);
+  card.appendChild(totalRow);
+}
+
+// ---------- 本月洞察(日均 / 較上月 / 最大單筆) ----------
+function renderInsights(key, monthEntries) {
+  const card = $('#insights-card');
+  card.innerHTML = '';
+  const isIncome = reportType === 'income';
+  const typed = monthEntries.filter((e) => (e.type === 'income') === isIncome);
+  const total = typed.reduce((s, e) => s + e.amountCents, 0);
+  if (!typed.length) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const isCurrent = reportMonth.y === now.getFullYear() && reportMonth.m === now.getMonth() + 1;
+  const daysInMonth = new Date(reportMonth.y, reportMonth.m, 0).getDate();
+  const elapsed = isCurrent ? now.getDate() : daysInMonth;
+
+  // 較上月(當月比同期,過去月份比整月)
+  let pm = reportMonth.m - 1, py = reportMonth.y;
+  if (pm <= 0) { pm = 12; py -= 1; }
+  const pKey = `${py}-${String(pm).padStart(2, '0')}`;
+  const prevDaysInMonth = new Date(py, pm, 0).getDate();
+  const cutoff = isCurrent ? Math.min(elapsed, prevDaysInMonth) : prevDaysInMonth;
+  const prevTotal = entries
+    .filter((e) => (e.type === 'income') === isIncome && e.date.startsWith(pKey)
+      && Number(e.date.slice(8, 10)) <= cutoff)
+    .reduce((s, e) => s + e.amountCents, 0);
+
+  let deltaTxt = '—', deltaCls = '';
+  if (prevTotal > 0) {
+    const pct = ((total - prevTotal) / prevTotal) * 100;
+    deltaTxt = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
+    // 支出漲=紅,收入漲=綠
+    deltaCls = (pct >= 0) === isIncome ? 'good' : 'bad';
+    if (Math.abs(pct) < 0.5) deltaCls = '';
+  }
+
+  const top = typed.reduce((a, b) => (b.amountCents > a.amountCents ? b : a));
+  const cats = catMap();
+  const topLabel = top.note || catName(cats.get(top.categoryId));
+
+  const tiles = [
+    { label: isIncome ? t('avgPerDayIncome') : t('avgPerDay'), value: formatRM(Math.round(total / Math.max(1, elapsed))) },
+    { label: isCurrent ? t('vsSamePeriod') : t('vsLastMonth'), value: deltaTxt, cls: deltaCls },
+    { label: t('topSpend'), value: formatRM(top.amountCents), sub: topLabel },
+  ];
+  for (const tile of tiles) {
+    const el = document.createElement('div');
+    el.className = 'insight-tile card';
+    el.innerHTML = `<div class="insight-label"></div><div class="insight-value num"></div><div class="insight-sub" hidden></div>`;
+    el.querySelector('.insight-label').textContent = tile.label;
+    const v = el.querySelector('.insight-value');
+    v.textContent = tile.value;
+    if (tile.cls) v.classList.add('insight-' + tile.cls);
+    if (tile.sub) {
+      const s = el.querySelector('.insight-sub');
+      s.textContent = tile.sub;
+      s.hidden = false;
+    }
+    card.appendChild(el);
+  }
+}
+
+// ---------- 每日長條圖 ----------
+function renderDaily(key, monthEntries) {
+  const card = $('#daily-card');
+  card.innerHTML = '';
+  const isIncome = reportType === 'income';
+  const typed = monthEntries.filter((e) => (e.type === 'income') === isIncome);
+  if (!typed.length) { card.hidden = true; return; }
+  card.hidden = false;
+
+  const daysInMonth = new Date(reportMonth.y, reportMonth.m, 0).getDate();
+  const perDay = new Array(daysInMonth).fill(0);
+  for (const e of typed) {
+    const d = Number(e.date.slice(8, 10));
+    if (d >= 1 && d <= daysInMonth) perDay[d - 1] += e.amountCents;
+  }
+  const max = Math.max(1, ...perDay);
+  const isCurrent = reportMonth.y === now.getFullYear() && reportMonth.m === now.getMonth() + 1;
+  const today = now.getDate();
+
+  const title = document.createElement('div');
+  title.className = 'trend-title';
+  title.textContent = isIncome ? t('dailyTitleIncome') : t('dailyTitle');
+  card.appendChild(title);
+
+  const chart = document.createElement('div');
+  chart.className = 'daily-chart';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const col = document.createElement('div');
+    col.className = 'daily-col' + (isCurrent && d === today ? ' today' : '');
+    const h = perDay[d - 1] > 0 ? Math.max(5, (perDay[d - 1] / max) * 100) : 0;
+    const showLabel = d === 1 || d % 5 === 0;   // 尾日不另標,避免 30/31 重疊
+    col.innerHTML = `
+      <span class="daily-bar-wrap"><span class="daily-bar" style="height:${h.toFixed(1)}%"></span></span>
+      <span class="daily-day">${showLabel ? d : ''}</span>`;
+    chart.appendChild(col);
+  }
+  card.appendChild(chart);
 }
 
 // ---------- 近 6 個月趨勢 ----------
@@ -1048,6 +1330,25 @@ function renderCategoryChips() {
   }
 }
 
+function renderAccountChips() {
+  const rowEl = $('#account-row');
+  rowEl.innerHTML = '';
+  rowEl.hidden = accounts.length < 2;   // 只有一個帳戶時不佔版面
+  for (const a of accounts) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'acct-chip' + (a.id === selectedAcctId ? ' selected' : '');
+    chip.innerHTML = `<span class="cat-dot"></span><span></span>`;
+    chip.querySelector('.cat-dot').style.background = a.color;
+    chip.children[1].textContent = acctName(a);
+    chip.addEventListener('click', () => {
+      selectedAcctId = a.id;
+      renderAccountChips();
+    });
+    rowEl.appendChild(chip);
+  }
+}
+
 function renderAmount() {
   amountTextEl.textContent = amountStr || '0';
 }
@@ -1069,6 +1370,8 @@ function openSheet(entry = null) {
   editingId = entry?.id ?? null;
   amountStr = entry ? centsToInputStr(entry.amountCents) : '';
   selectedCatId = entry?.categoryId ?? null;
+  selectedAcctId = entry?.accountId ?? defaultAcctId();
+  renderAccountChips();
   noteInput.value = entry?.note ?? '';
   dateInput.value = entry?.date ?? todayStr();
   deleteBtn.hidden = !entry;
@@ -1113,9 +1416,13 @@ async function onSave() {
     amountCents,
     type: sheetType,
     categoryId: selectedCatId,
+    accountId: selectedAcctId || defaultAcctId(),
     note: noteInput.value.trim(),
     date: dateInput.value || todayStr(),
   };
+  if (record.accountId) localStorage.setItem('lastAccountId', record.accountId);
+
+  const isNew = !editingId;
 
   if (editingId) {
     const idx = entries.findIndex((e) => e.id === editingId);
@@ -1130,6 +1437,8 @@ async function onSave() {
   renderList();
   if (!viewReportEl.hidden) renderReport();
   if (detailCatId !== null) renderCatDetail();
+  // 只有新增才播;編輯既有記錄不該再演一次
+  if (isNew) (record.type === 'income' ? moneyRain() : moneyBurn());
 }
 
 async function onDelete() {
@@ -1175,8 +1484,117 @@ function renderCatList() {
   catListEl.appendChild(addRow);
 }
 
+// ---------- 帳戶管理 ----------
+let editingAcctId = null;   // null = 新增
+let acctEditorColor = null;
+
+function renderAcctList() {
+  const listEl2 = $('#acct-list');
+  listEl2.innerHTML = '';
+  for (const a of accounts) {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'cat-row';
+    row.innerHTML = `
+      <span class="cat-dot"></span>
+      <span class="cat-row-name"></span>
+      <span class="cat-row-count num"></span>
+      <span class="cat-row-chevron">›</span>`;
+    row.querySelector('.cat-dot').style.background = a.color;
+    row.querySelector('.cat-row-name').textContent = acctName(a);
+    const bal = acctBalance(a);
+    const balEl = row.querySelector('.cat-row-count');
+    balEl.textContent = formatRM(bal);
+    if (bal < 0) balEl.style.color = 'var(--red)';
+    row.addEventListener('click', () => openAcctEditor(a));
+    listEl2.appendChild(row);
+  }
+  const addRow = document.createElement('button');
+  addRow.type = 'button';
+  addRow.className = 'cat-row cat-row-add';
+  addRow.innerHTML = `<span class="add-mark">＋</span><span class="cat-row-name"></span>`;
+  addRow.querySelector('.cat-row-name').textContent = t('newAccount');
+  addRow.addEventListener('click', () => openAcctEditor(null));
+  listEl2.appendChild(addRow);
+}
+
+function renderAcctColorGrid() {
+  const grid = $('#acct-color-grid');
+  grid.innerHTML = '';
+  for (const color of PALETTE) {
+    const swatch = document.createElement('button');
+    swatch.type = 'button';
+    swatch.className = 'color-swatch' + (color === acctEditorColor ? ' selected' : '');
+    swatch.style.background = color;
+    swatch.addEventListener('click', () => {
+      acctEditorColor = color;
+      renderAcctColorGrid();
+    });
+    grid.appendChild(swatch);
+  }
+}
+
+function openAcctEditor(acct) {
+  editingAcctId = acct?.id ?? null;
+  $('#acct-editor-title').textContent = acct ? t('editAccount') : t('newAccount');
+  $('#acct-name-input').value = acct ? acctName(acct) : '';
+  $('#acct-opening-input').value = acct?.openingCents ? centsToInputStr(acct.openingCents) : '';
+  acctEditorColor = acct?.color ?? PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  renderAcctColorGrid();
+  $('#acct-delete-btn').hidden = !acct || accounts.length <= 1;
+  $('#acct-editor').classList.add('open');
+  $('#acct-editor-backdrop').classList.add('open');
+}
+
+function closeAcctEditor() {
+  $('#acct-editor').classList.remove('open');
+  $('#acct-editor-backdrop').classList.remove('open');
+}
+
+async function onAcctSave() {
+  const name = $('#acct-name-input').value.trim().slice(0, 12);
+  if (!name) return;
+  const opening = toCents($('#acct-opening-input').value.trim());
+  if (editingAcctId) {
+    const a = accounts.find((x) => x.id === editingAcctId);
+    if (a) {
+      if (name !== acctName(a)) { a.name = name; a.renamed = true; }
+      a.color = acctEditorColor;
+      a.openingCents = opening > 0 ? opening : 0;
+    }
+  } else {
+    accounts.push({ id: crypto.randomUUID(), name, color: acctEditorColor, openingCents: opening > 0 ? opening : 0 });
+  }
+  await saveAccounts(accounts);
+  schedulePush();
+  closeAcctEditor();
+  renderAcctList();
+  renderList();
+  if (!viewReportEl.hidden) renderReport();
+}
+
+async function onAcctDelete() {
+  if (!editingAcctId) return;
+  if (accounts.length <= 1) { alert(t('lastAccountNoDelete')); return; }
+  const count = entries.filter((e) => (e.accountId || accounts[0]?.id) === editingAcctId).length;
+  if (!confirm(t('confirmDeleteAccount', count))) return;
+  accounts = accounts.filter((a) => a.id !== editingAcctId);
+  const fallback = accounts[0].id;
+  for (const e of entries) {
+    if (e.accountId === editingAcctId || !e.accountId) e.accountId = fallback;
+  }
+  if (localStorage.getItem('lastAccountId') === editingAcctId) localStorage.removeItem('lastAccountId');
+  await Promise.all([saveAccounts(accounts), saveEntries(entries)]);
+  schedulePush();
+  closeAcctEditor();
+  renderAcctList();
+  renderList();
+  if (!viewReportEl.hidden) renderReport();
+}
+
 function openCatModal() {
   renderCatList();
+  renderAcctList();
   budgetInput.value = meta.monthlyBudgetCents ? centsToInputStr(meta.monthlyBudgetCents) : '';
   renderRecurList();
   renderLockStatus();
@@ -1184,7 +1602,6 @@ function openCatModal() {
   updateSyncStatus();
   renderCurrencyList();
   updateSettingsHubStatuses();
-  $('#userkey-input').value = localStorage.getItem('userAnthropicKey') || '';
   updateProUI();
   checkEntitlement();
   showSettingsHub();          // 每次打開都回到主頁
@@ -1367,6 +1784,7 @@ async function materializeRecurring() {
       createdAt: Date.now() + added,
       amountCents: r.amountCents,
       type: r.type,
+      accountId: defaultAcctId(),
       categoryId: r.categoryId,
       note: r.note,
       date,
@@ -1548,9 +1966,10 @@ async function exportBackup() {
     entries,
     meta,
     recurring,
+    accounts,
   };
   const ok = await shareOrDownload(
-    `centsei-backup-${todayStr()}.json`,
+    `richmama-backup-${todayStr()}.json`,
     JSON.stringify(payload, null, 2),
     'application/json'
   );
@@ -1564,17 +1983,18 @@ function csvCell(v) {
 
 async function exportCsv() {
   const cats = catMap();
-  const header = ['date', 'type', 'category', 'note', 'amount'];
+  const am = acctMap();
+  const header = ['date', 'type', 'category', 'account', 'note', 'amount'];
   const lines = [...entries]
     .sort((a, b) => a.date.localeCompare(b.date) || a.createdAt - b.createdAt)
     .map((e) =>
-      [e.date, e.type, catName(cats.get(e.categoryId)), e.note || '', (e.amountCents / 100).toFixed(2)]
+      [e.date, e.type, catName(cats.get(e.categoryId)), acctName(am.get(e.accountId)) || '', e.note || '', (e.amountCents / 100).toFixed(2)]
         .map(csvCell)
         .join(',')
     );
   // 加 BOM 讓 Excel 正確辨識 UTF-8
   const csv = '﻿' + [header.join(','), ...lines].join('\n');
-  await shareOrDownload(`centsei-${todayStr()}.csv`, csv, 'text/csv');
+  await shareOrDownload(`richmama-${todayStr()}.csv`, csv, 'text/csv');
 }
 
 // 設定頁:上次備份狀態
@@ -1711,7 +2131,15 @@ async function onImportFile(file) {
     recurring = [...recurMap.values()];
   }
 
-  await Promise.all([saveEntries(entries), saveCategories(categories), saveMeta(meta), saveRecurring(recurring)]);
+  // accounts:以 id 合併
+  const inAccts2 = Array.isArray(data.accounts) ? data.accounts.map(sanitizeAccount).filter(Boolean) : [];
+  if (inAccts2.length) {
+    const acctMapById = new Map(accounts.map((x) => [x.id, x]));
+    for (const x of inAccts2) acctMapById.set(x.id, x);
+    accounts = [...acctMapById.values()];
+  }
+
+  await Promise.all([saveEntries(entries), saveCategories(categories), saveMeta(meta), saveRecurring(recurring), saveAccounts(accounts)]);
   schedulePush();
   renderList();
   renderReport();
@@ -1988,7 +2416,7 @@ function generateSyncCode() {
 
 async function encryptPayload() {
   const iv = crypto.getRandomValues(new Uint8Array(12));
-  const data = new TextEncoder().encode(JSON.stringify({ categories, entries, meta, recurring }));
+  const data = new TextEncoder().encode(JSON.stringify({ categories, entries, meta, recurring, accounts }));
   const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, syncKey, data);
   return { iv: bufToB64(iv.buffer), ciphertext: bufToB64(ct) };
 }
@@ -1996,6 +2424,20 @@ async function decryptPayload(ivB64, ctB64) {
   const iv = new Uint8Array(b64ToBuf(ivB64));
   const pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, syncKey, b64ToBuf(ctB64));
   return JSON.parse(new TextDecoder().decode(pt));
+}
+
+function sanitizeAccount(a) {
+  if (!a || typeof a !== 'object' || typeof a.name !== 'string' || !a.name.trim()) return null;
+  const out = {
+    id: typeof a.id === 'string' && a.id ? a.id : crypto.randomUUID(),
+    name: a.name.trim().slice(0, 12),
+    color: /^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : '#8C95A3',
+    openingCents: 0,
+  };
+  const op = Math.round(Number(a.openingCents));
+  if (Number.isFinite(op) && op > 0) out.openingCents = op;
+  if (a.renamed === true) out.renamed = true;
+  return out;
 }
 
 // 把遠端資料合併進本機(以 id 聯集,遠端優先;不弄丟資料)
@@ -2016,6 +2458,13 @@ function mergeRemote(data) {
   for (const x of inRecur) rm.set(x.id, x);
   recurring = [...rm.values()];
 
+  const inAccts = Array.isArray(data.accounts) ? data.accounts.map(sanitizeAccount).filter(Boolean) : [];
+  if (inAccts.length) {
+    const am = new Map(accounts.map((x) => [x.id, x]));
+    for (const x of inAccts) am.set(x.id, x);
+    accounts = [...am.values()];
+  }
+
   if (data.meta && typeof data.meta === 'object') {
     const b = Math.round(Number(data.meta.monthlyBudgetCents));
     if (Number.isFinite(b) && b > 0) meta = { ...meta, monthlyBudgetCents: b };
@@ -2023,7 +2472,7 @@ function mergeRemote(data) {
 }
 
 async function persistAll() {
-  await Promise.all([saveEntries(entries), saveCategories(categories), saveMeta(meta), saveRecurring(recurring)]);
+  await Promise.all([saveEntries(entries), saveCategories(categories), saveMeta(meta), saveRecurring(recurring), saveAccounts(accounts)]);
 }
 
 function setSyncVersion(v) {
@@ -2035,6 +2484,7 @@ function refreshAfterSync() {
   renderList();
   if (!viewReportEl.hidden) renderReport();
   renderCatList();
+  renderAcctList();
   if (detailCatId !== null) renderCatDetail();
 }
 
@@ -2230,8 +2680,19 @@ async function fileToBase64(file, maxDim = 1280, quality = 0.7) {
   return cv.toDataURL('image/jpeg', quality).split(',')[1];
 }
 
+// Apple 5.1.2:把使用者的財務文件送到第三方(Anthropic)前,必須先明確告知並取得同意。
+// 同意記在本機,每種功能問一次。
+function ensureAiConsent(kind) {
+  const key = 'aiConsent:' + kind;
+  if (localStorage.getItem(key) === '1') return true;
+  const ok = confirm(t(kind === 'receipt' ? 'aiConsentReceipt' : 'aiConsentStatement'));
+  if (ok) localStorage.setItem(key, '1');
+  return ok;
+}
+
 async function onReceiptFile(file) {
   if (!file) return;
+  if (!ensureAiConsent('receipt')) return;
   const btn = $('#receipt-btn');
   const label = btn.querySelector('.receipt-label');
   const original = label.textContent;
@@ -2249,7 +2710,6 @@ async function onReceiptFile(file) {
         mediaType: 'image/jpeg',
         categories: names,
         installId: getInstallId(),
-        userKey: localStorage.getItem('userAnthropicKey') || undefined,
       }),
     });
     if (!res.ok) {
@@ -2258,7 +2718,6 @@ async function onReceiptFile(file) {
       if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
       else if (res.status === 429) alert(t('receiptRate'));
       else if (res.status === 503) alert(t('receiptBusy'));
-      else if (e.error === 'ai_failed' && e.status === 401) alert(t('byoKeyInvalid'));
       else alert(t('receiptFailed'));
       return;
     }
@@ -2288,10 +2747,71 @@ async function onReceiptFile(file) {
   }
 }
 
-// ---------- Pro 訂閱(Stripe) ----------
+// ---------- Pro 訂閱 ----------
+// Web 用 Stripe;原生殼層用商店內購(StoreKit / Play Billing via RevenueCat,避開 3.1.1)。
 const WORKER_BASE = 'https://daily-ledger-sync.yuxuanchin95.workers.dev';
+// RevenueCat Public SDK key。在 RevenueCat → Project → API keys 取得(iOS 為 appl_…,Android 為 goog_…)。
+const REVENUECAT_IOS_KEY = 'appl_RUMkTHZXFfjCiraVUjeqZcEQSSA';
+const REVENUECAT_ANDROID_KEY = 'goog_PQVyVvEOPkdjQOnLjtghnxBOohA';
+const REVENUECAT_KEY = (window.Capacitor?.getPlatform?.() === 'android')
+  ? REVENUECAT_ANDROID_KEY : REVENUECAT_IOS_KEY;
 let isPro = false;
 let proUntil = null;
+let proPriceStr = null; // 原生 paywall 顯示的在地化價格（如 RM12.90 / US$2.99）
+
+// 懶載入 IAP shim（只在 iOS 殼層、且只載一次）。Web 永不觸發。
+let _iapMod = null;
+async function iapModule() {
+  if (_iapMod) return _iapMod;
+  _iapMod = await import('./iap.bundle.js');
+  return _iapMod;
+}
+// ---------- 廣告(免費版限定) ----------
+// AdMob App/Ad unit 是綁平台的,iOS 和 Android 各自獨立申請,不能共用。
+// Android 目前還是 Google 官方測試 banner 佔位(不會產生無效流量/停權)——
+// 等 AdMob 主控台建好 Android app + 正式 banner unit 後要換成真實 ID。
+const ADMOB_BANNER_ID_IOS = 'ca-app-pub-1502132653355957/4667553024'; // RichMama Bottom Banner (iOS)
+const ADMOB_BANNER_ID_ANDROID = 'ca-app-pub-3940256099942544/6300978111'; // Google test banner (Android) — TODO: swap for real unit
+const ADMOB_BANNER_ID = (window.Capacitor?.getPlatform?.() === 'android')
+  ? ADMOB_BANNER_ID_ANDROID : ADMOB_BANNER_ID_IOS;
+
+let _adsMod = null;
+async function adsModule() {
+  if (_adsMod) return _adsMod;
+  window.__ADMOB_BANNER_ID__ = ADMOB_BANNER_ID;
+  _adsMod = await import('./ads.bundle.js');
+  return _adsMod;
+}
+
+// Pro 用戶「完全不載入」SDK,而不是載入後隱藏——
+// 後者仍會收集廣告識別碼,等於白白違背對付費用戶的承諾。
+// 廣告總開關:等拿到正式 AdMob ID 再開。
+// 絕不能帶著 Google 測試廣告上架——用戶會看到「Test Ad」字樣且收入為零。
+const ADS_ENABLED = true;
+
+async function syncAds() {
+  if (!ADS_ENABLED || !IS_NATIVE) return;
+  try {
+    if (isPro) {
+      if (_adsMod) await _adsMod.stopAds();
+      return;
+    }
+    const m = await adsModule();
+    await m.startAds();
+  } catch {
+    /* 廣告載不出來不該擋住記帳功能 */
+  }
+}
+
+async function iapReady() {
+  const m = await iapModule();
+  await m.configureIAP(REVENUECAT_KEY, getInstallId());
+  return m;
+}
+
+// 訂閱週期文字:Apple 3.1.2 要求購買點清楚標示「長度」,且說明不可與實際方案不符
+const PLAN_UNIT_KEY = { weekly: 'unitWeek', monthly: 'unitMonth', annual: 'unitYear' };
+const planUnit = (plan) => t(PLAN_UNIT_KEY[plan] || 'unitMonth');
 
 function updateProUI() {
   const label = $('#pro-label');
@@ -2304,19 +2824,49 @@ function updateProUI() {
     $('#pro-btn').classList.add('is-pro');
     hint.textContent = t('proThanks');
   } else {
-    label.textContent = t('upgradePro');
     status.textContent = '';
     $('#pro-btn').classList.remove('is-pro');
-    // iOS 上不得出現外部購買的價格/CTA → 隱藏購買鈕,改用中性說明
-    hint.textContent = IS_NATIVE ? t('proNativeHint') : t('proPitch');
+    if (IS_NATIVE) {
+      // 原生:方案由下方 picker 選,按鈕本身只當「購買」動作
+      label.textContent = t('upgradeProGeneric');
+      const isAndroid = window.Capacitor?.getPlatform?.() === 'android';
+      hint.textContent = t(isAndroid ? 'proPitchIAPAndroid' : 'proPitchIAP', planUnit(selectedPlan));
+    } else {
+      label.textContent = t('upgradePro');
+      hint.textContent = t('proPitch');
+    }
   }
-  // iOS 包裝版:永遠隱藏購買入口;Web 版維持原本行為
-  if (IS_NATIVE) $('#pro-btn').hidden = true;
-  // 恢復購買:已是 Pro 就不顯示;非 Pro 時顯示(iOS 也需要它來啟用外部購買)
+  // iOS 也顯示購買鈕(內購合規);Web 維持原本行為
+  $('#pro-btn').hidden = false;
+  // 恢復購買:已是 Pro 就不顯示
   $('#restore-btn').hidden = isPro;
+  // iOS 未訂閱時顯示自動續訂法務連結(Apple 要求 paywall 附 Terms/隱私)
+  const legal = $('#pro-legal');
+  if (legal) legal.hidden = !(IS_NATIVE && !isPro);
+  renderPlanPicker();
+  syncAds();
 }
 
 async function onRestore() {
+  if (IS_NATIVE) {
+    // iOS:用 Apple 帳號還原內購
+    try {
+      const m = await iapReady();
+      const res = await m.restorePro();
+      if (res.pro) {
+        isPro = true;
+        proUntil = res.until || null;
+        updateProUI();
+        alert(t('restoreFound'));
+      } else {
+        alert(t('restoreNotFound'));
+      }
+    } catch {
+      alert(t('restoreFailed'));
+    }
+    return;
+  }
+  // Web:用 email 比對 Stripe 訂閱還原
   const email = (prompt(t('restorePrompt')) || '').trim();
   if (!email) return;
   try {
@@ -2342,6 +2892,22 @@ async function onRestore() {
 }
 
 async function checkEntitlement() {
+  if (IS_NATIVE) {
+    // iOS:訂閱狀態與價格來自 RevenueCat（StoreKit）
+    try {
+      const m = await iapReady();
+      proPriceStr = await m.getPriceString().catch(() => null);
+      const s = await m.getProStatus();
+      isPro = !!s.pro;
+      proUntil = s.until || null;
+      updateProUI();
+    } catch {
+      /* 離線或尚未設定金鑰:維持現狀 */
+      updateProUI();
+    }
+    return;
+  }
+  // Web:Stripe 入帳狀態
   try {
     const r = await fetch(`${WORKER_BASE}/entitlement?installId=${getInstallId()}`);
     if (!r.ok) return;
@@ -2354,8 +2920,89 @@ async function checkEntitlement() {
   }
 }
 
+// ---------- 方案選擇(週/月/年) ----------
+
+// 價格字串一律用 StoreKit 回的在地化結果,不自己組貨幣符號——
+// 同一個 App 在不同國家幣別和稅制都不同。
+async function renderPlanPicker() {
+  const picker = $('#plan-picker');
+  if (!IS_NATIVE || isPro) { picker.hidden = true; return; }
+  let plans = null;
+  try {
+    const m = await iapReady();
+    plans = await m.getPlans();
+  } catch {
+    picker.hidden = true;
+    return;
+  }
+  const available = [];
+  for (const plan of ['annual', 'monthly', 'weekly']) {
+    const row = picker.querySelector(`[data-plan="${plan}"]`);
+    const info = plans && plans[plan];
+    if (!info || !info.priceString) { row.hidden = true; continue; }
+    row.hidden = false;
+    available.push(plan);
+    // 「RM 39.90 / 年」——價格 + 週期一起顯示
+    $(`#plan-${plan}-price`).textContent = `${info.priceString} / ${planUnit(plan)}`;
+  }
+  // 年繳省多少:拿月繳年化來比,算得出來才顯示
+  const sub = $('#plan-annual-sub');
+  const a = plans && plans.annual, mo = plans && plans.monthly;
+  if (a && mo && typeof a.price === 'number' && typeof mo.price === 'number' && mo.price > 0) {
+    const pct = Math.round((1 - a.price / (mo.price * 12)) * 100);
+    sub.textContent = pct > 0 ? t('planSave', pct) : '';
+  } else {
+    sub.textContent = '';
+  }
+  picker.hidden = !available.length;
+  // 選中的方案若沒上架(例如沙盒只載到部分產品),要改選第一個可用的——
+  // 否則說明文字的續訂週期會跟畫面上的方案對不上(Apple 3.1.2)
+  selectPlan(available.includes(selectedPlan) ? selectedPlan : (available[0] || selectedPlan));
+}
+
+let selectedPlan = 'annual';
+
+function selectPlan(plan) {
+  selectedPlan = plan;
+  $('#plan-picker').querySelectorAll('.plan-row').forEach((r) => {
+    r.classList.toggle('selected', r.dataset.plan === plan);
+  });
+  // 續訂週期說明要跟著改,否則選年繳卻寫「每月續訂」= 誤導(3.1.2)
+  if (IS_NATIVE && !isPro) {
+    const isAndroid = window.Capacitor?.getPlatform?.() === 'android';
+    $('#pro-hint').textContent = t(isAndroid ? 'proPitchIAPAndroid' : 'proPitchIAP', planUnit(plan));
+  }
+}
+
+$('#plan-picker').addEventListener('click', (e) => {
+  const row = e.target.closest('.plan-row');
+  if (row) selectPlan(row.dataset.plan);
+});
+
 async function onProClick() {
   if (isPro) return; // 已是 Pro
+  if (IS_NATIVE) {
+    // iOS:Apple 內購(StoreKit via RevenueCat),買使用者選的那一檔
+    const btn = $('#pro-btn');
+    btn.disabled = true;
+    try {
+      const m = await iapReady();
+      const res = await m.purchasePro(selectedPlan);
+      if (res.cancelled) return; // 使用者取消,不報錯
+      if (res.pro) {
+        isPro = true;
+        proUntil = res.until || null;
+        updateProUI();
+        alert(t('proWelcome'));
+      }
+    } catch {
+      alert(t('proCheckoutFailed'));
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+  // Web:Stripe 結帳
   try {
     const r = await fetch(`${WORKER_BASE}/checkout`, {
       method: 'POST',
@@ -2398,17 +3045,203 @@ langBtn.addEventListener('click', () => setLang(lang === 'en' ? 'zh' : 'en'));
 $('#pro-btn').addEventListener('click', onProClick);
 $('#restore-btn').addEventListener('click', onRestore);
 
-$('#userkey-input').addEventListener('change', (e) => {
-  const v = e.target.value.trim();
-  if (v) localStorage.setItem('userAnthropicKey', v);
-  else localStorage.removeItem('userAnthropicKey');
-});
 
 $('#receipt-btn').addEventListener('click', () => $('#receipt-input').click());
 $('#receipt-input').addEventListener('change', (e) => {
   onReceiptFile(e.target.files[0]);
   e.target.value = '';
 });
+
+// ---------- 明細頁頂部:掃收據 / 匯入對帳單 ----------
+
+// 明細頁的「掃描收據」= 開記帳頁再觸發既有的收據流程,避免兩套邏輯
+$('#scan-receipt-btn').addEventListener('click', () => $('#scan-receipt-input').click());
+$('#scan-receipt-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  openSheet();
+  setSheetType('expense');
+  onReceiptFile(file);
+});
+
+$('#import-stmt-btn').addEventListener('click', () => $('#stmt-input').click());
+$('#stmt-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  onStatementFile(file);
+});
+
+const reconSheetEl = $('#recon-sheet');
+const reconBackdropEl = $('#recon-backdrop');
+const reconListEl = $('#recon-list');
+let reconRows = [];
+
+async function onStatementFile(file) {
+  if (!file) return;
+  if (!ensureAiConsent('statement')) return;
+  const btn = $('#import-stmt-btn');
+  const label = btn.querySelector('span');
+  const original = label.textContent;
+  btn.disabled = true;
+  label.textContent = t('reconBusy');
+  try {
+    const names = catsOfType('expense').map((c) => catName(c));
+    let txns = null;
+
+    const isCsv = /\.csv$/i.test(file.name) || file.type === 'text/csv';
+    if (isCsv) {
+      const text = await file.text();
+      // AI 優先:讓 Claude 一次做解析 + 支出類別智能分類;
+      // 失敗(額度用完/離線)才退回本地解析(類別會落在「其他」)。
+      try {
+        txns = await parseWithAI({
+          kind: 'text', data: text, categories: names,
+          installId: getInstallId(), lang,
+        });
+      } catch (aiErr) {
+        txns = parseCsv(text);
+        if (!txns) throw aiErr;
+      }
+      if (!txns || !txns.length) txns = parseCsv(text);
+    } else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+      const data = await fileToBase64Raw(file);
+      txns = await parseWithAI({
+        kind: 'pdf', data, categories: names,
+        installId: getInstallId(), lang,
+      });
+    } else {
+      const data = await fileToBase64(file, 1800, 0.8); // 帳單字小,給高一點解析度
+      txns = await parseWithAI({
+        kind: 'image', data, mediaType: 'image/jpeg', categories: names,
+        installId: getInstallId(), lang,
+      });
+    }
+
+    if (!txns || !txns.length) { alert(t('reconEmpty')); return; }
+    openRecon(txns);
+  } catch (err) {
+    if (err.code === 'quota') alert(IS_NATIVE ? t('reconQuotaNative') : t('reconQuota'));
+    else if (err.code === 'rate') alert(t('receiptRate'));
+    else if (err.code === 'global') alert(t('receiptBusy'));
+    else alert(t('reconFailed'));
+  } finally {
+    btn.disabled = false;
+    label.textContent = original;
+  }
+}
+
+// PDF 要原始 base64(不能走縮圖那條)
+function fileToBase64Raw(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(String(r.result).split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+
+function openRecon(txns) {
+  const result = reconcile(txns, entries);
+  reconRows = result.rows;
+  $('#recon-summary').textContent =
+    t('reconSummary', result.total, result.matched, result.missing + result.review) +
+    (result.otherCount ? ' · ' + t('reconOtherCard', result.otherCount) : '');
+  renderRecon();
+  reconSheetEl.classList.add('open');
+  reconBackdropEl.classList.add('open');
+}
+
+function closeRecon() {
+  reconSheetEl.classList.remove('open');
+  reconBackdropEl.classList.remove('open');
+  reconRows = [];
+}
+
+function renderRecon() {
+  const pending = reconRows.filter((r) => r.status === 'missing' || r.status === 'review');
+  const addAll = $('#recon-add-all');
+  addAll.hidden = !pending.length;
+  addAll.textContent = t('reconAddAll', pending.length);
+
+  reconListEl.innerHTML = '';
+  for (const [i, r] of reconRows.entries()) {
+    const row = document.createElement('div');
+    row.className = 'recon-row';
+    const chipCls = { matched: 'ok', review: 'warn', missing: 'bad', credit: 'mut' }[r.status];
+    const chipTxt = {
+      matched: t('reconMatched'), review: t('reconReview'),
+      missing: t('reconMissing'), credit: t('reconCredit'),
+    }[r.status];
+
+    const info = document.createElement('div');
+    info.className = 'recon-main';
+    const d = document.createElement('div');
+    d.className = 'recon-desc';
+    d.textContent = r.txn.label || r.txn.desc || '—';
+    const meta = document.createElement('div');
+    meta.className = 'recon-meta';
+    // 副行:日期 + 原始帳單描述(有 label 時保留原文對照)
+    meta.textContent = r.txn.label && r.txn.desc ? `${r.txn.date} · ${r.txn.desc}` : r.txn.date;
+    info.append(d, meta);
+
+    const right = document.createElement('div');
+    right.className = 'recon-right';
+    const amt = document.createElement('div');
+    amt.className = 'recon-amt num';
+    amt.textContent = (r.txn.direction === 'credit' ? '+' : '') + formatRM(Math.round(r.txn.amount * 100));
+    const chip = document.createElement('span');
+    chip.className = 'chip ' + chipCls;
+    chip.textContent = chipTxt;
+    right.append(amt, chip);
+
+    row.append(info, right);
+
+    if (r.status === 'missing' || r.status === 'review') {
+      const add = document.createElement('button');
+      add.className = 'recon-add';
+      add.type = 'button';
+      add.textContent = t('reconAdd');
+      add.addEventListener('click', () => addFromStatement(i));
+      row.append(add);
+    }
+    reconListEl.append(row);
+  }
+}
+
+async function addFromStatement(i) {
+  const r = reconRows[i];
+  if (!r || r.status === 'matched') return;
+  const match = r.txn.category
+    ? catsOfType('expense').find((c) => catName(c).toLowerCase() === String(r.txn.category).toLowerCase())
+    : null;
+  const fallback = catsOfType('expense').find((c) => c.id === 'other') || catsOfType('expense')[0];
+  entries.push({
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    amountCents: Math.round(r.txn.amount * 100),
+    type: 'expense',
+    accountId: defaultAcctId(),
+    categoryId: (match || fallback)?.id ?? null,
+    note: (r.txn.label || r.txn.desc || '').slice(0, 60),
+    date: r.txn.date,
+    source: 'stmt',
+  });
+  r.status = 'matched';
+  await saveEntries(entries);
+  schedulePush();
+  renderList();
+  if (!viewReportEl.hidden) renderReport();
+  renderRecon();
+}
+
+$('#recon-add-all').addEventListener('click', async () => {
+  for (const [i, r] of reconRows.entries()) {
+    if (r.status === 'missing' || r.status === 'review') await addFromStatement(i);
+  }
+});
+$('#recon-close').addEventListener('click', closeRecon);
+reconBackdropEl.addEventListener('click', closeRecon);
 
 tabListBtn.addEventListener('click', () => switchView('list'));
 tabReportBtn.addEventListener('click', () => switchView('report'));
@@ -2486,6 +3319,12 @@ searchClearBtn.addEventListener('click', () => {
 // 整月預算
 budgetInput.addEventListener('change', onBudgetChange);
 
+// 帳戶編輯器
+$('#acct-editor-cancel').addEventListener('click', closeAcctEditor);
+$('#acct-editor-backdrop').addEventListener('click', closeAcctEditor);
+$('#acct-editor-save').addEventListener('click', onAcctSave);
+$('#acct-delete-btn').addEventListener('click', onAcctDelete);
+
 // 固定支出編輯器
 $('#recur-cancel').addEventListener('click', closeRecurEditor);
 recurEditorBackdropEl.addEventListener('click', closeRecurEditor);
@@ -2548,8 +3387,8 @@ async function init() {
   // 設了 PIN 就先鎖住(內容在鎖屏後面,不可見)
   if (pinIsSet()) showLock('unlock');
 
-  [entries, categories, meta, recurring] = await Promise.all([
-    getEntries(), getCategories(), getMeta(), getRecurring(),
+  [entries, categories, meta, recurring, accounts] = await Promise.all([
+    getEntries(), getCategories(), getMeta(), getRecurring(), getAccounts(),
   ]);
   await materializeRecurring();   // 補當月固定支出
   renderList();

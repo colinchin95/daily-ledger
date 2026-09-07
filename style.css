@@ -1,19 +1,43 @@
+/* RichMama — 香檳絲綢主題(取色自 App 圖示:絲綢、金幣、酒紅指甲) */
 :root {
-  --bg: #000000;
-  --surface: #1c1c1e;
-  --surface-2: #2c2c2e;
-  --surface-3: #3a3a3c;
-  --separator: rgba(84, 84, 88, 0.5);
-  --text: #ffffff;
-  --text-2: rgba(235, 235, 245, 0.6);
-  --text-3: rgba(235, 235, 245, 0.3);
-  --gold: #d9b64d;
-  --gold-bright: #eccb5f;
-  --gold-deep: #b8932f;
-  --green: #66cb87;
-  --red: #ff6961;
-  --blur-bar: rgba(18, 18, 20, 0.82);
+  --bg: #EDE4D5;
+  --surface: #F8F3EA;
+  --surface-2: #E4D9C6;
+  --surface-3: #D6C7AE;
+  --separator: rgba(90, 74, 55, 0.16);
+  --text: #2B2118;
+  --text-2: rgba(43, 33, 24, 0.60);
+  --text-3: rgba(43, 33, 24, 0.34);
+  --gold: #755C10;        /* 文字用:對香檳底 5.06:1,過 WCAG AA */
+  --gold-bright: #C9A227; /* 漸層頂端,維持金屬光澤 */
+  --gold-deep: #5A4708;
+  --green: #4E6B4A;
+  --red: #8E2A20;
+  --blur-bar: rgba(243, 236, 224, 0.82);
+  --on-gold: #FDFAF2;
+  --serif: ui-serif, "New York", Georgia, "Songti TC", "Songti SC", serif;
   --spring: cubic-bezier(0.32, 0.72, 0.33, 1);
+}
+
+/* 深色:午夜絲絨——同一套語言的暗面(濃咖啡地 + 香檳字 + 金) */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #17120C;
+    --surface: #221B13;
+    --surface-2: #2E251A;
+    --surface-3: #3C3122;
+    --separator: rgba(226, 205, 170, 0.16);
+    --text: #F0E6D4;
+    --text-2: rgba(240, 230, 212, 0.62);
+    --text-3: rgba(240, 230, 212, 0.34);
+    --gold: #D4AF37;
+    --gold-bright: #E8C963;
+    --gold-deep: #A8862A;
+    --green: #8FB07F;
+    --red: #D97A6A;
+    --blur-bar: rgba(23, 18, 12, 0.82);
+    --on-gold: #1D1605;
+  }
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -25,6 +49,10 @@ html, body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   -webkit-font-smoothing: antialiased;
+  touch-action: manipulation; /* 關掉雙擊放大手勢 */
+  overscroll-behavior: none;  /* 拖過頭不要把整頁拖走(iOS WebView 會卡住不回彈) */
+  overflow-x: hidden;         /* 禁止橫向拖移 */
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
@@ -73,6 +101,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 
 .large-title {
   margin: 0;
+  font-family: var(--serif);
   font-size: 34px;
   font-weight: 700;
   letter-spacing: 0.4px;
@@ -203,7 +232,8 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .month-label {
   min-width: 130px;
   text-align: center;
-  font-size: 17px;
+  font-family: var(--serif);
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -216,11 +246,18 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 
 .summary-card { text-align: center; padding: 22px 18px; }
 
-.summary-caption { font-size: 13px; color: var(--text-2); margin-bottom: 6px; letter-spacing: 1px; }
+.summary-caption {
+  font-size: 11px;
+  color: var(--text-2);
+  margin-bottom: 8px;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+}
 
 .summary-amount {
-  font-size: 40px;
-  font-weight: 700;
+  font-family: var(--serif);
+  font-size: 44px;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
   margin-bottom: 12px;
@@ -364,7 +401,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   border: none;
   border-radius: 50%;
   background: linear-gradient(170deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%);
-  color: #1d1605;
+  color: var(--on-gold);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -591,7 +628,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   font-weight: 600;
   letter-spacing: 6px;
   font-family: inherit;
-  color: #1d1605;
+  color: var(--on-gold);
   background: linear-gradient(170deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%);
   border: none;
   border-radius: 13px;
@@ -847,7 +884,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .backup-banner-later { background: var(--surface-2); color: var(--text-2); }
 .backup-banner-now {
   background: linear-gradient(170deg, var(--gold-bright), var(--gold));
-  color: #1d1605;
+  color: var(--on-gold);
 }
 .backup-banner-btn:active { opacity: 0.7; }
 
@@ -927,20 +964,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   cursor: pointer;
 }
 .restore-link:active { opacity: 0.5; }
-
-/* 設定:自備金鑰輸入 */
-.byo-row { display: block; padding: 13px 16px; }
-.byo-input {
-  width: 100%;
-  background: none;
-  border: none;
-  outline: none;
-  font-family: inherit;
-  font-size: 15px;
-  color: var(--text);
-  letter-spacing: 0.5px;
-}
-.byo-input::placeholder { color: var(--text-3); }
 
 /* 設定:法律連結 */
 .legal-row { text-decoration: none; color: var(--text); }
@@ -1144,3 +1167,275 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .lock-face-btn:active { opacity: 0.6; }
 
 [hidden] { display: none !important; }
+
+/* ---------- 明細頁頂部:掃收據 / 匯入對帳單 ---------- */
+.import-row {
+  display: flex;
+  align-items: stretch; /* 兩顆等高,長標籤換行時才不會一高一矮 */
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.import-btn {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 10px 8px;
+  border: 1px solid var(--separator);
+  border-radius: 11px;
+  background: var(--surface);
+  color: var(--gold);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+}
+
+.import-btn svg { width: 17px; height: 17px; flex: none; }
+.import-btn:active { background: var(--surface-2); }
+.import-btn:disabled { opacity: 0.55; }
+
+/* ---------- 對帳審核清單 ---------- */
+/* z-index 必須高於 .editor-backdrop(32),否則遮罩蓋住整個面板,按鈕全點不到 */
+.recon-sheet { max-height: 88dvh; display: flex; flex-direction: column; z-index: 33; }
+
+.recon-summary {
+  margin: 0 16px 10px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.recon-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px calc(env(safe-area-inset-bottom) + 20px);
+}
+
+.recon-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 0;
+  border-top: 0.5px solid var(--separator);
+}
+
+.recon-main { flex: 1; min-width: 0; }
+
+.recon-desc {
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recon-meta { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+
+.recon-right { text-align: right; flex: none; }
+.recon-amt { font-size: 15px; font-weight: 600; }
+
+.chip {
+  display: inline-block;
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chip.ok   { color: var(--green); background: color-mix(in srgb, var(--green) 15%, transparent); }
+.chip.warn { color: var(--gold);  background: color-mix(in srgb, var(--gold) 15%, transparent); }
+.chip.bad  { color: var(--red);   background: color-mix(in srgb, var(--red) 15%, transparent); }
+.chip.mut  { color: var(--text-3); background: var(--surface-2); }
+
+.recon-add {
+  flex: none;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(170deg, var(--gold-bright), var(--gold));
+  color: var(--on-gold);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.recon-add:active { opacity: 0.75; }
+
+/* ---------- 訂閱方案選擇(週/月/年) ---------- */
+.plan-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0 4px;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 13px 14px;
+  border: 1.5px solid var(--separator);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-row.selected {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 8%, var(--surface));
+}
+
+.plan-main { flex: 1; min-width: 0; }
+.plan-name { display: block; font-size: 16px; font-weight: 600; }
+
+.plan-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--green);
+}
+
+.plan-price {
+  font-size: 16px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+.plan-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: linear-gradient(170deg, var(--gold-bright), var(--gold));
+  color: var(--on-gold);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ---------- 帳戶(記帳面板 chips) ---------- */
+.account-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 2px 12px;
+  scrollbar-width: none;
+}
+.account-row::-webkit-scrollbar { display: none; }
+.account-row[hidden] { display: none; }
+
+.acct-chip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-2);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.acct-chip .cat-dot { width: 7px; height: 7px; }
+.acct-chip.selected {
+  color: var(--text);
+  border-color: var(--gold);
+  background: rgba(217, 182, 77, 0.12);
+}
+
+/* 明細列:帳戶小標 */
+.entry-acct {
+  margin-left: 8px;
+  font-size: 11px;
+  color: var(--text-3);
+  border: 1px solid var(--separator);
+  border-radius: 6px;
+  padding: 1px 6px;
+  vertical-align: 1px;
+}
+
+/* ---------- 報表:帳戶餘額卡 ---------- */
+.acct-bal-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 2px;
+  border-bottom: 1px solid var(--separator);
+}
+.acct-bal-row:last-child { border-bottom: none; }
+.acct-bal-name { flex: 1; font-size: 14px; color: var(--text-2); }
+.acct-bal-amt { font-size: 15px; font-weight: 600; }
+.acct-bal-total { padding-top: 11px; }
+.acct-bal-total .acct-bal-name { font-weight: 600; color: var(--text); }
+.acct-bal-total .acct-bal-amt { font-family: var(--serif); font-size: 17px; }
+
+/* ---------- 報表:洞察三格 ---------- */
+.insights-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.insights-row[hidden] { display: none; }
+.insight-tile { padding: 12px 10px; margin-bottom: 0; }
+.insight-label { font-size: 11px; color: var(--text-3); margin-bottom: 5px; letter-spacing: 0.2px; }
+.insight-value { font-size: 16px; font-weight: 650; }
+.insight-value.insight-good { color: var(--green); }
+.insight-value.insight-bad { color: var(--red); }
+.insight-sub {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 報表:每日長條圖 ---------- */
+.daily-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 96px;
+  margin-top: 10px;
+}
+.daily-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  min-width: 0;
+}
+.daily-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.daily-bar {
+  width: 100%;
+  max-width: 10px;
+  border-radius: 2px 2px 0 0;
+  background: var(--surface-3);
+  min-height: 0;
+}
+.daily-col.today .daily-bar {
+  background: linear-gradient(180deg, var(--gold-bright), var(--gold));
+}
+.daily-day { font-size: 9px; color: var(--text-3); height: 11px; }

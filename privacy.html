@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Centsei — Privacy Policy</title>
+<title>RichMama — Privacy Policy</title>
 <style>
   :root { color-scheme: dark; }
   body { margin:0; background:#000; color:#e8e6e0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; line-height:1.65; }
@@ -19,10 +19,10 @@
 </head>
 <body>
 <main>
-  <h1>Privacy Policy — Centsei</h1>
-  <div class="eff">Last updated: 15 June 2026</div>
+  <h1>Privacy Policy — RichMama</h1>
+  <div class="eff">Last updated: 22 August 2026</div>
 
-  <p>Centsei is a personal expense tracker built to be <strong>private by default</strong>. This policy explains exactly what happens to your data.</p>
+  <p>RichMama is a personal expense tracker built to be <strong>private by default</strong>. This policy explains exactly what happens to your data.</p>
 
   <h2>1. Your data lives on your device</h2>
   <p>Your transactions, categories, budgets, and settings are stored <strong>locally on your device</strong> (in the browser's IndexedDB / localStorage). We do not have a server that holds your ledger, and we cannot see it.</p>
@@ -31,25 +31,33 @@
   <p>If you turn on Cloud Sync, your data is <strong>encrypted on your device</strong> (AES-GCM, with a key derived from your sync code) <em>before</em> it is uploaded. Our server stores only the encrypted blob and can never read its contents. Your sync code and encryption key never leave your device. If you lose your sync code, the data cannot be decrypted by anyone, including us.</p>
 
   <h2>3. Receipt scanning (third-party AI)</h2>
-  <p>If you use "Scan receipt", the photo you choose is sent — over an encrypted connection, through our processing endpoint — to <strong>Anthropic</strong> (the Claude API) solely to extract the amount, date, merchant, and category. We do <strong>not</strong> store the image; it is processed and discarded. Anthropic processes the image under its own terms; per Anthropic's policy, API inputs are not used to train its models. If you do not use receipt scanning, no images are ever sent anywhere.</p>
-  <p>If you supply your own Anthropic API key (optional), that key is held only in memory to forward the request and is <strong>never stored or logged</strong> by us; it is saved only on your own device.</p>
+  <p>If you use "Scan receipt", the photo you choose is sent — over an encrypted connection, through our processing endpoint — to <strong>Anthropic</strong> (the Claude API) solely to extract the amount, date, merchant, and category. We do <strong>not</strong> store the image; it is processed and discarded. Anthropic processes the image under its own terms; per Anthropic's policy, API inputs are not used to train its models. If you do not use receipt scanning, no images are ever sent anywhere. Before the first upload we ask for your explicit confirmation.</p>
 
-  <h2>4. No accounts, no ads, no tracking</h2>
-  <p>Centsei has no sign-up, no advertising, and no analytics or third-party trackers. To enforce the free monthly receipt-scan limit, an anonymous random identifier (a <code>UUID</code>) is generated on your device and sent only with scan requests. It is not linked to your identity and contains no personal information.</p>
+  <h2>4. Bank &amp; credit-card statement import (third-party AI)</h2>
+  <p>If you use "Import Bank / Credit card statement", the file you choose — a CSV, PDF or photo of a statement — is sent, over an encrypted connection and through our processing endpoint, to <strong>Anthropic</strong> (the Claude API) solely to extract the transaction date, description, amount and a suggested category, and to produce a readable label for each line. We <strong>ask for your explicit confirmation before the first upload</strong>. We do <strong>not</strong> store the file; it is processed and discarded. Anthropic processes it under its own terms; per Anthropic's policy, API inputs are not used to train its models.</p>
+  <p>The extracted transactions are shown to you for review and are only written into your ledger — which stays on your device — when you tap "Add". If you do not use statement import, no statement ever leaves your device.</p>
 
-  <h2>5. Children</h2>
-  <p>Centsei is a general-audience utility and is not directed at children under 13.</p>
+  <h2>5. Advertising (free version only)</h2>
+  <p>The free version of RichMama shows ads supplied by <strong>Google AdMob</strong>. To serve them, the Google Mobile Ads SDK may collect device and usage information such as a device advertising identifier, coarse location inferred from your IP address, and basic app-interaction data. This is handled by Google under <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener">Google's Privacy &amp; Terms</a>, not by us — we never receive your ledger data through it, and your transactions are never shared with advertisers.</p>
+  <p><strong>Personalized ads are opt-in.</strong> On iOS, we ask for permission through Apple's App Tracking Transparency prompt. If you decline (or never respond), you still see ads, but they are <strong>non-personalized</strong> and no advertising identifier is used to track you across other apps and websites. You can change this at any time in iOS Settings &rarr; Privacy &amp; Security &rarr; Tracking.</p>
+  <p><strong>Subscribers see no ads.</strong> An active RichMama Pro subscription removes advertising entirely, and the ads SDK is not initialised.</p>
 
-  <h2>6. Deleting your data</h2>
+  <h2>6. No accounts, no analytics on your ledger</h2>
+  <p>RichMama has no sign-up and no analytics or third-party trackers on your financial data. To enforce the free monthly receipt-scan and statement-import limits, an anonymous random identifier (a <code>UUID</code>) is generated on your device and sent only with those requests. It is not linked to your identity and contains no personal information.</p>
+
+  <h2>7. Children</h2>
+  <p>RichMama is a general-audience utility and is not directed at children under 13.</p>
+
+  <h2>8. Deleting your data</h2>
   <p>Because data is local, you can remove it by deleting your entries, clearing the app's website data, or uninstalling. If you used Cloud Sync, stopping sync leaves the encrypted copy until it expires or is overwritten.</p>
 
-  <h2>7. Changes</h2>
+  <h2>9. Changes</h2>
   <p>We may update this policy; the "Last updated" date will change accordingly.</p>
 
-  <h2>8. Contact</h2>
+  <h2>10. Contact</h2>
   <p>Questions about privacy: <a href="mailto:yuxuanchin95@gmail.com">yuxuanchin95@gmail.com</a></p>
 
-  <p class="note">This document is a good-faith plain-language summary, not legal advice. Before selling Centsei in your market (and especially for GDPR/EU, UK, CCPA/California users), have a qualified lawyer review it and add any jurisdiction-specific terms.</p>
+  <p class="note">This document is a good-faith plain-language summary, not legal advice. Before selling RichMama in your market (and especially for GDPR/EU, UK, CCPA/California users), have a qualified lawyer review it and add any jurisdiction-specific terms.</p>
 </main>
 </body>
 </html>

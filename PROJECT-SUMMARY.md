@@ -5,7 +5,7 @@
 > 原始碼:https://github.com/colinchin95/daily-ledger
 
 ## 一句話定位
-本機優先(local-first)、不需註冊、無廣告、無付費牆的個人記帳 PWA;
+本機優先(local-first)、不需註冊的個人記帳 PWA(免費版含廣告,Pro 移除);
 資料預設只存在使用者裝置上,可選擇開啟「端到端加密」雲端同步。
 
 ## 目標使用者

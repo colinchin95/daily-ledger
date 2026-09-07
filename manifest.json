@@ -1,6 +1,6 @@
 {
-  "name": "Centsei",
-  "short_name": "Centsei",
+  "name": "RichMama",
+  "short_name": "RichMama",
   "description": "Private, local-first expense tracking with receipt scanning. Your data stays on your device.",
   "start_url": "./",
   "scope": "./",

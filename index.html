@@ -2,16 +2,16 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
-  <title>Centsei</title>
+  <title>RichMama</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Centsei">
+  <meta name="apple-mobile-web-app-title" content="RichMama">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,7 +20,7 @@
       <button id="lang-btn" class="nav-btn left" type="button">EN</button>
       <button id="cat-manage-btn" class="nav-btn" type="button" data-i18n="settings">設定</button>
     </div>
-    <h1 class="large-title" data-i18n="appTitle">Centsei</h1>
+    <h1 class="large-title" data-i18n="appTitle">RichMama</h1>
   </header>
 
   <!-- 資料保護提示:有資料但未開同步時提醒 -->
@@ -52,6 +52,18 @@
       <input id="search-input" class="search-input" type="search" data-i18n-ph="searchPlaceholder" placeholder="搜尋備註、分類或金額" autocomplete="off">
       <button id="search-clear" class="search-clear" type="button" aria-label="clear" hidden>✕</button>
     </div>
+    <div class="import-row">
+      <button id="scan-receipt-btn" class="import-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <span data-i18n="scanReceipt">掃描收據</span>
+      </button>
+      <button id="import-stmt-btn" class="import-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span data-i18n="importStatement">匯入銀行 / 信用卡對帳單</span>
+      </button>
+    </div>
+    <input id="scan-receipt-input" type="file" accept="image/*" hidden>
+    <input id="stmt-input" type="file" accept=".csv,.pdf,image/*" hidden>
     <div id="entry-list" class="entry-list"></div>
     <div id="empty-state" class="empty-state" hidden>
       <div class="empty-icon">✦</div>
@@ -78,12 +90,18 @@
       </div>
     </section>
 
+    <section id="accounts-card" class="card accounts-card"></section>
+
     <section id="budget-card" class="card budget-card" hidden></section>
 
     <div class="seg" id="report-seg">
       <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
       <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
     </div>
+
+    <section id="insights-card" class="insights-row"></section>
+
+    <section id="daily-card" class="card daily-card"></section>
 
     <section id="trend-card" class="card trend-card"></section>
 
@@ -124,6 +142,8 @@
     </div>
 
     <div id="category-row" class="category-row"></div>
+
+    <div id="account-row" class="account-row"></div>
 
     <button id="receipt-btn" class="receipt-btn" type="button">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 8.5 4.5 7 6 8.5 7.5 7 9 8.5 10.5 7 12 8.5 13.5 7 15 8.5 16.5 7 18 8.5 19.5 7 21 8.5V20l-2.2-1.3L16.6 20l-2.2-1.3L12.2 20 10 18.7 7.8 20 5.6 18.7 3 20V8.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11.5h10M7 14.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -171,6 +191,10 @@
           <span class="cat-row-name" data-i18n="categoriesSection">分類</span>
           <span class="cat-row-chevron">›</span>
         </button>
+        <button class="cat-row settings-row" data-page="accounts" data-title-key="accountsSection" type="button">
+          <span class="cat-row-name" data-i18n="accountsSection">帳戶</span>
+          <span class="cat-row-chevron">›</span>
+        </button>
         <button class="cat-row settings-row" data-page="budget" data-title-key="budgetRecurringTitle" type="button">
           <span class="cat-row-name" data-i18n="budgetRecurringTitle">預算與固定支出</span>
           <span class="cat-row-chevron">›</span>
@@ -185,7 +209,7 @@
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="cloud" data-title-key="cloudTitle" type="button">
-          <span class="cat-row-name" data-i18n="cloudTitle">Centsei Cloud</span>
+          <span class="cat-row-name" data-i18n="cloudTitle">RichMama Cloud</span>
           <span id="cloud-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
@@ -214,6 +238,12 @@
       <div id="cat-list" class="cat-list"></div>
     </div>
 
+    <!-- 子頁:帳戶 -->
+    <div class="settings-page" data-page="accounts" hidden>
+      <div id="acct-list" class="cat-list"></div>
+      <p class="backup-hint" data-i18n="accountsHint">收入與支出可分別記入不同帳戶;餘額 = 期初餘額 + 收入 − 支出。</p>
+    </div>
+
     <!-- 子頁:預算與固定支出 -->
     <div class="settings-page" data-page="budget" hidden>
       <div class="section-label" data-i18n="monthlyBudget">每月總預算</div>
@@ -239,22 +269,45 @@
       <div class="cat-list">
         <button id="pro-btn" class="cat-row pro-row" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.7 6.2.6-4.7 4.1 1.4 6.1L12 16.9 6.5 19.6l1.4-6.1L3.2 9.3l6.2-.6L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" id="pro-label" data-i18n="upgradePro">升級 Pro(US$2.99/月)</span>
+          <span class="cat-row-name" id="pro-label" data-i18n="upgradePro">升級 Pro</span>
           <span id="pro-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
+
+      <!-- 方案選擇:年繳預設選中(最高轉換 + 最佳單位經濟) -->
+      <div id="plan-picker" class="plan-picker" hidden>
+        <button class="plan-row" type="button" data-plan="annual">
+          <span class="plan-main">
+            <span class="plan-name" data-i18n="planAnnual">年繳</span>
+            <span class="plan-sub" id="plan-annual-sub"></span>
+          </span>
+          <span class="plan-price" id="plan-annual-price">—</span>
+          <span class="plan-badge" data-i18n="planBest">最划算</span>
+        </button>
+        <button class="plan-row" type="button" data-plan="monthly">
+          <span class="plan-main">
+            <span class="plan-name" data-i18n="planMonthly">月繳</span>
+          </span>
+          <span class="plan-price" id="plan-monthly-price">—</span>
+        </button>
+        <button class="plan-row" type="button" data-plan="weekly">
+          <span class="plan-main">
+            <span class="plan-name" data-i18n="planWeekly">週繳</span>
+          </span>
+          <span class="plan-price" id="plan-weekly-price">—</span>
+        </button>
+      </div>
       <p class="backup-hint pro-hint" id="pro-hint"></p>
       <button id="restore-btn" class="restore-link" type="button" data-i18n="restorePurchase" hidden>恢復購買</button>
-      <div class="cat-list">
-        <label class="cat-row byo-row">
-          <input id="userkey-input" class="byo-input" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" data-i18n-ph="byoPlaceholder" placeholder="sk-ant-…(自備金鑰,可空)">
-        </label>
-      </div>
-      <p class="backup-hint" data-i18n="byoHint">貼上你自己的 Anthropic 金鑰 → 收據掃描無限、不佔免費額度。</p>
+      <p class="backup-hint pro-legal" id="pro-legal" hidden>
+        <a href="terms.html" target="_blank" rel="noopener" data-i18n="termsOfService">服務條款</a>
+        ·
+        <a href="privacy.html" target="_blank" rel="noopener" data-i18n="privacyPolicy">隱私政策</a>
+      </p>
     </div>
 
-    <!-- 子頁:Centsei Cloud -->
+    <!-- 子頁:RichMama Cloud -->
     <div class="settings-page" data-page="cloud" hidden>
       <div class="cat-list">
         <button id="sync-row" class="cat-row" type="button">
@@ -264,7 +317,7 @@
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
-      <p class="backup-hint" data-i18n="cloudHubHint">用 Centsei Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。</p>
+      <p class="backup-hint" data-i18n="cloudHubHint">用 RichMama Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。</p>
     </div>
 
     <!-- 子頁:App 鎖 -->
@@ -336,6 +389,19 @@
   </section>
 
   <!-- 分類編輯器 -->
+  <!-- 對帳審核清單 -->
+  <div id="recon-backdrop" class="backdrop editor-backdrop"></div>
+  <section id="recon-sheet" class="sheet recon-sheet">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="recon-close" class="sheet-header-btn" type="button" data-i18n="done">完成</button>
+      <span class="sheet-title" data-i18n="reconcileTitle">月結對帳</span>
+      <button id="recon-add-all" class="sheet-header-btn strong" type="button" hidden></button>
+    </div>
+    <p id="recon-summary" class="recon-summary"></p>
+    <div id="recon-list" class="recon-list"></div>
+  </section>
+
   <div id="cat-editor-backdrop" class="backdrop editor-backdrop"></div>
   <section id="cat-editor" class="sheet cat-editor">
     <div class="grabber"></div>
@@ -351,6 +417,24 @@
       <input id="cat-budget-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="categoryBudget" placeholder="每月預算（可空）">
     </label>
     <button id="cat-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteCategory" hidden>刪除分類</button>
+  </section>
+
+  <!-- 帳戶編輯器 -->
+  <div id="acct-editor-backdrop" class="backdrop editor-backdrop"></div>
+  <section id="acct-editor" class="sheet cat-editor">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="acct-editor-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
+      <span id="acct-editor-title" class="sheet-title">編輯帳戶</span>
+      <button id="acct-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">儲存</button>
+    </div>
+    <input id="acct-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="accountName" placeholder="帳戶名稱" maxlength="12">
+    <div id="acct-color-grid" class="color-grid"></div>
+    <label class="budget-field">
+      <span class="budget-field-prefix">RM</span>
+      <input id="acct-opening-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="openingBalance" placeholder="期初餘額（可空）">
+    </label>
+    <button id="acct-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteAccount" hidden>刪除帳戶</button>
   </section>
 
   <!-- 固定支出編輯器 -->
@@ -387,7 +471,7 @@
     <div class="grabber"></div>
     <div class="sheet-header">
       <button id="sync-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
-      <span class="sheet-title" data-i18n="cloudTitle">Centsei Cloud</span>
+      <span class="sheet-title" data-i18n="cloudTitle">RichMama Cloud</span>
       <span style="min-width:52px"></span>
     </div>
     <p class="sync-intro" data-i18n="syncIntro"></p>
