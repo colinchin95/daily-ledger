@@ -1439,3 +1439,84 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   background: linear-gradient(180deg, var(--gold-bright), var(--gold));
 }
 .daily-day { font-size: 9px; color: var(--text-3); height: 11px; }
+
+/* ---------- 對帳單匯入進度 ---------- */
+.stmt-progress {
+  margin: -4px 0 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: 12px;
+}
+.stmt-progress[hidden] { display: none; }
+
+.stmt-progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.stmt-progress-label { font-size: 13px; color: var(--text-2); }
+.stmt-progress-step { font-size: 12px; color: var(--text-3); }
+
+.stmt-progress-track {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+/* 已完成階段:真實比例,不假造 */
+.stmt-progress-bar {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--gold-bright), var(--gold));
+  transition: width 0.45s var(--spring);
+}
+
+/* 未完成的部分掃過一道光,表示還在等時間未知的工作 */
+.stmt-progress-track.busy::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(201, 162, 39, 0.45) 50%,
+    transparent 100%
+  );
+  animation: stmt-sweep 1.15s ease-in-out infinite;
+}
+
+@keyframes stmt-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stmt-progress-track.busy::after { animation: none; opacity: 0.35; }
+  .stmt-progress-bar { transition: none; }
+}
+
+/* ---------- 免費版廣告橫幅讓位 ----------
+   原生 AdMob 橫幅疊在整個 WebView 之上(CSS z-index 管不到),
+   ads.bundle.js 會把實際高度寫進 --ad-h 並在 body 加 .has-ad。
+   橫幅貼在安全區域之上,所以 tab bar 要抬到「安全區 + 橫幅高度」,
+   並拿掉自己的安全區留白,避免蓋到廣告(AdMob 政策禁止遮擋廣告)。 */
+body.has-ad { padding-bottom: calc(120px + var(--ad-h, 0px)); }
+
+body.has-ad .tab-bar {
+  bottom: calc(env(safe-area-inset-bottom) + var(--ad-h, 0px));
+  padding-bottom: 8px;
+}
+
+/* 底部面板與全螢幕頁面:最底下的按鈕(例如記帳的「儲存」)不能被橫幅蓋住 */
+body.has-ad .sheet {
+  padding-bottom: calc(env(safe-area-inset-bottom) + var(--ad-h, 0px) + 14px);
+}
+body.has-ad .modal {
+  padding-bottom: calc(20px + var(--ad-h, 0px));
+}

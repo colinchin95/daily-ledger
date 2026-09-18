@@ -64,6 +64,17 @@
     </div>
     <input id="scan-receipt-input" type="file" accept="image/*" hidden>
     <input id="stmt-input" type="file" accept=".csv,.pdf,image/*" hidden>
+
+    <!-- 對帳單匯入進度:填滿的部分是已完成的真實階段,剩餘部分跑掃描動畫 -->
+    <div id="stmt-progress" class="stmt-progress" hidden>
+      <div class="stmt-progress-head">
+        <span id="stmt-progress-label" class="stmt-progress-label"></span>
+        <span id="stmt-progress-step" class="stmt-progress-step num"></span>
+      </div>
+      <div id="stmt-progress-track" class="stmt-progress-track">
+        <div id="stmt-progress-bar" class="stmt-progress-bar"></div>
+      </div>
+    </div>
     <div id="entry-list" class="entry-list"></div>
     <div id="empty-state" class="empty-state" hidden>
       <div class="empty-icon">✦</div>

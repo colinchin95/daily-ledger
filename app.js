@@ -160,6 +160,10 @@ const STRINGS = {
     planAnnual: '年繳',
     planMonthly: '月繳',
     planWeekly: '週繳',
+    stmtStepRead: '讀取檔案',
+    stmtStepAnalyse: 'AI 解析中',
+    stmtStepMatch: '比對帳目',
+    stmtStepOf: (a, b) => `${a} / ${b}`,
     unitWeek: '週',
     unitMonth: '月',
     unitYear: '年',
@@ -368,6 +372,10 @@ const STRINGS = {
     planAnnual: 'Yearly',
     planMonthly: 'Monthly',
     planWeekly: 'Weekly',
+    stmtStepRead: 'Reading file',
+    stmtStepAnalyse: 'Analysing with AI',
+    stmtStepMatch: 'Matching entries',
+    stmtStepOf: (a, b) => `${a} / ${b}`,
     unitWeek: 'week',
     unitMonth: 'month',
     unitYear: 'year',
@@ -3077,6 +3085,30 @@ const reconBackdropEl = $('#recon-backdrop');
 const reconListEl = $('#recon-list');
 let reconRows = [];
 
+// 對帳單匯入進度:三個真實階段。填滿的比例 = 已完成的階段數(不假造百分比),
+// 剩下的部分跑掃描動畫,表示還在等一個時間未知的工作(AI 解析)。
+const STMT_STAGES = ['stmtStepRead', 'stmtStepAnalyse', 'stmtStepMatch'];
+
+function stmtProgress(stage) {
+  const box = $('#stmt-progress');
+  if (stage === null) { box.hidden = true; return; }
+  const bar = $('#stmt-progress-bar');
+  const track = $('#stmt-progress-track');
+  box.hidden = false;
+  $('#stmt-progress-label').textContent = t(STMT_STAGES[stage]);
+  $('#stmt-progress-step').textContent = t('stmtStepOf', stage + 1, STMT_STAGES.length);
+  bar.style.width = `${(stage / STMT_STAGES.length) * 100}%`;
+  track.classList.add('busy');
+}
+
+function stmtProgressDone() {
+  const bar = $('#stmt-progress-bar');
+  const track = $('#stmt-progress-track');
+  track.classList.remove('busy');
+  bar.style.width = '100%';
+  setTimeout(() => { $('#stmt-progress').hidden = true; bar.style.width = '0%'; }, 450);
+}
+
 async function onStatementFile(file) {
   if (!file) return;
   if (!ensureAiConsent('statement')) return;
@@ -3085,6 +3117,7 @@ async function onStatementFile(file) {
   const original = label.textContent;
   btn.disabled = true;
   label.textContent = t('reconBusy');
+  stmtProgress(0);                       // 讀取檔案
   try {
     const names = catsOfType('expense').map((c) => catName(c));
     let txns = null;
@@ -3092,6 +3125,7 @@ async function onStatementFile(file) {
     const isCsv = /\.csv$/i.test(file.name) || file.type === 'text/csv';
     if (isCsv) {
       const text = await file.text();
+      stmtProgress(1);                   // AI 解析
       // AI 優先:讓 Claude 一次做解析 + 支出類別智能分類;
       // 失敗(額度用完/離線)才退回本地解析(類別會落在「其他」)。
       try {
@@ -3106,12 +3140,14 @@ async function onStatementFile(file) {
       if (!txns || !txns.length) txns = parseCsv(text);
     } else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
       const data = await fileToBase64Raw(file);
+      stmtProgress(1);                   // AI 解析
       txns = await parseWithAI({
         kind: 'pdf', data, categories: names,
         installId: getInstallId(), lang,
       });
     } else {
       const data = await fileToBase64(file, 1800, 0.8); // 帳單字小,給高一點解析度
+      stmtProgress(1);                   // AI 解析
       txns = await parseWithAI({
         kind: 'image', data, mediaType: 'image/jpeg', categories: names,
         installId: getInstallId(), lang,
@@ -3119,13 +3155,17 @@ async function onStatementFile(file) {
     }
 
     if (!txns || !txns.length) { alert(t('reconEmpty')); return; }
+    stmtProgress(2);                     // 比對帳目
     openRecon(txns);
+    stmtProgressDone();
   } catch (err) {
     if (err.code === 'quota') alert(IS_NATIVE ? t('reconQuotaNative') : t('reconQuota'));
     else if (err.code === 'rate') alert(t('receiptRate'));
     else if (err.code === 'global') alert(t('receiptBusy'));
     else alert(t('reconFailed'));
   } finally {
+    // 還在 busy = 中途失敗,直接收掉(成功路徑已由 stmtProgressDone 收尾)
+    if ($('#stmt-progress-track').classList.contains('busy')) stmtProgress(null);
     btn.disabled = false;
     label.textContent = original;
   }
