@@ -1,26 +1,26 @@
 <!DOCTYPE html>
-<html lang="zh-Hant">
+<html lang="en-MY">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#000000">
-  <title>RichMama</title>
+  <title>RichAuntie</title>
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="RichMama">
+  <meta name="apple-mobile-web-app-title" content="RichAuntie">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <header class="app-header">
     <div class="nav-bar">
-      <button id="lang-btn" class="nav-btn left" type="button">EN</button>
-      <button id="cat-manage-btn" class="nav-btn" type="button" data-i18n="settings">設定</button>
+      <span class="nav-spacer"></span>
+      <button id="cat-manage-btn" class="nav-btn" type="button" data-i18n="settings">Settings</button>
     </div>
-    <h1 class="large-title" data-i18n="appTitle">RichMama</h1>
+    <h1 class="large-title" data-i18n="appTitle">RichAuntie</h1>
   </header>
 
   <!-- 資料保護提示:有資料但未開同步時提醒 -->
@@ -30,8 +30,8 @@
       <span class="backup-banner-text protect-text"></span>
     </div>
     <div class="backup-banner-actions">
-      <button id="protect-later" class="backup-banner-btn backup-banner-later" type="button" data-i18n="later">稍後</button>
-      <button id="protect-enable" class="backup-banner-btn backup-banner-now" type="button" data-i18n="protectEnable">開啟同步</button>
+      <button id="protect-later" class="backup-banner-btn backup-banner-later" type="button" data-i18n="later">Later</button>
+      <button id="protect-enable" class="backup-banner-btn backup-banner-now" type="button" data-i18n="protectEnable">Turn on sync</button>
     </div>
   </div>
 
@@ -43,23 +43,25 @@
         <span class="backup-banner-text"></span>
       </div>
       <div class="backup-banner-actions">
-        <button id="backup-banner-later" class="backup-banner-btn backup-banner-later" type="button" data-i18n="later">稍後</button>
-        <button id="backup-banner-now" class="backup-banner-btn backup-banner-now" type="button" data-i18n="backupNow">立即備份</button>
+        <button id="backup-banner-later" class="backup-banner-btn backup-banner-later" type="button" data-i18n="later">Later</button>
+        <button id="backup-banner-now" class="backup-banner-btn backup-banner-now" type="button" data-i18n="backupNow">Back up now</button>
       </div>
     </div>
     <div class="search-bar">
       <svg class="search-icon" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <input id="search-input" class="search-input" type="search" data-i18n-ph="searchPlaceholder" placeholder="搜尋備註、分類或金額" autocomplete="off">
+      <input id="search-input" class="search-input" type="search" data-i18n-ph="searchPlaceholder" placeholder="Search note, category or amount" autocomplete="off">
       <button id="search-clear" class="search-clear" type="button" aria-label="clear" hidden>✕</button>
     </div>
+    <div id="note-chips" class="note-chips" hidden></div>
+    <div id="search-summary" class="search-summary num" hidden></div>
     <div class="import-row">
       <button id="scan-receipt-btn" class="import-btn" type="button">
         <svg viewBox="0 0 24 24" fill="none"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span data-i18n="scanReceipt">掃描收據</span>
+        <span data-i18n="scanReceipt">Scan receipt</span>
       </button>
       <button id="import-stmt-btn" class="import-btn" type="button">
         <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-        <span data-i18n="importStatement">匯入銀行 / 信用卡對帳單</span>
+        <span data-i18n="importStatement">Import Bank / Credit card statement</span>
       </button>
     </div>
     <input id="scan-receipt-input" type="file" accept="image/*" hidden>
@@ -78,8 +80,8 @@
     <div id="entry-list" class="entry-list"></div>
     <div id="empty-state" class="empty-state" hidden>
       <div class="empty-icon">✦</div>
-      <p data-i18n="emptyTitle">還沒有任何帳目</p>
-      <p class="empty-hint" data-i18n="emptyHint">點下方「＋」記下第一筆</p>
+      <p data-i18n="emptyTitle">No entries yet</p>
+      <p class="empty-hint" data-i18n="emptyHint">Tap "+" below to add your first one</p>
     </div>
   </main>
 
@@ -92,12 +94,12 @@
     </div>
 
     <section class="card summary-card">
-      <div class="summary-caption" data-i18n="monthSpending">本月支出</div>
+      <div class="summary-caption" data-i18n="monthSpending">Spent this month</div>
       <div id="report-expense" class="summary-amount">RM 0.00</div>
       <div class="summary-sub">
-        <span><span data-i18n="income">收入</span> <span id="report-income" class="num income-text">RM 0.00</span></span>
+        <span><span data-i18n="income">Income</span> <span id="report-income" class="num income-text">RM 0.00</span></span>
         <span class="summary-divider"></span>
-        <span><span data-i18n="balance">結餘</span> <span id="report-balance" class="num">RM 0.00</span></span>
+        <span><span data-i18n="balance">Balance</span> <span id="report-balance" class="num">RM 0.00</span></span>
       </div>
     </section>
 
@@ -106,8 +108,8 @@
     <section id="budget-card" class="card budget-card" hidden></section>
 
     <div class="seg" id="report-seg">
-      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
-      <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
+      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">Expense</button>
+      <button class="seg-btn" data-type="income" type="button" data-i18n="income">Income</button>
     </div>
 
     <section id="insights-card" class="insights-row"></section>
@@ -117,20 +119,22 @@
     <section id="trend-card" class="card trend-card"></section>
 
     <section id="report-breakdown" class="card breakdown-card"></section>
+
+    <section id="notes-card" class="card notes-card" hidden></section>
   </main>
 
   <!-- 底部 Tab Bar -->
   <nav class="tab-bar">
     <button id="tab-list" class="tab-btn active" type="button">
       <svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5h16M4 12h16M4 17.5h9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <span data-i18n="entries">明細</span>
+      <span data-i18n="entries">Entries</span>
     </button>
     <button id="add-btn" class="tab-add" type="button" aria-label="add">
       <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>
     </button>
     <button id="tab-report" class="tab-btn" type="button">
       <svg viewBox="0 0 24 24" fill="none"><path d="M5 20v-8M12 20V5M19 20v-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-      <span data-i18n="reports">報表</span>
+      <span data-i18n="reports">Reports</span>
     </button>
   </nav>
 
@@ -139,12 +143,12 @@
   <section id="sheet" class="sheet">
     <div class="grabber"></div>
     <div class="sheet-header">
-      <button id="sheet-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
+      <button id="sheet-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">Cancel</button>
       <div class="seg seg-small" id="type-seg">
-        <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
-        <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
+        <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">Expense</button>
+        <button class="seg-btn" data-type="income" type="button" data-i18n="income">Income</button>
       </div>
-      <button id="sheet-delete" class="sheet-header-btn danger" type="button" data-i18n="delete" hidden>刪除</button>
+      <button id="sheet-delete" class="sheet-header-btn danger" type="button" data-i18n="delete" hidden>Delete</button>
     </div>
 
     <div class="amount-display">
@@ -153,17 +157,18 @@
     </div>
 
     <div id="category-row" class="category-row"></div>
+    <div id="subcat-row" class="subcat-row" hidden></div>
 
     <div id="account-row" class="account-row"></div>
 
     <button id="receipt-btn" class="receipt-btn" type="button">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 8.5 4.5 7 6 8.5 7.5 7 9 8.5 10.5 7 12 8.5 13.5 7 15 8.5 16.5 7 18 8.5 19.5 7 21 8.5V20l-2.2-1.3L16.6 20l-2.2-1.3L12.2 20 10 18.7 7.8 20 5.6 18.7 3 20V8.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11.5h10M7 14.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <span class="receipt-label" data-i18n="scanReceipt">掃描收據</span>
+      <span class="receipt-label" data-i18n="scanReceipt">Scan receipt</span>
     </button>
     <input type="file" id="receipt-input" accept="image/*" hidden>
 
     <div class="field-row">
-      <input id="note-input" class="field-input" type="text" data-i18n-ph="notePlaceholder" placeholder="備註（可空）" maxlength="60">
+      <input id="note-input" class="field-input" type="text" data-i18n-ph="notePlaceholder" placeholder="Note (optional)" maxlength="60">
       <input id="date-input" class="field-input date-input" type="date">
     </div>
 
@@ -184,57 +189,61 @@
       </button>
     </div>
 
-    <button id="save-btn" class="save-btn" type="button" data-i18n="save">儲存</button>
+    <button id="save-btn" class="save-btn" type="button" data-i18n="save">Save</button>
   </section>
 
   <!-- 設定:分組清單 → 子頁 -->
   <section id="cat-modal" class="modal">
     <div class="nav-bar modal-nav">
-      <button id="settings-back" class="nav-btn left settings-back" type="button" style="visibility:hidden">‹ <span data-i18n="settings">設定</span></button>
-      <span id="settings-title" class="modal-title" data-i18n="settings">設定</span>
-      <button id="cat-done-btn" class="nav-btn strong" type="button" data-i18n="done">完成</button>
+      <button id="settings-back" class="nav-btn left settings-back" type="button" style="visibility:hidden">‹ <span data-i18n="settings">Settings</span></button>
+      <span id="settings-title" class="modal-title" data-i18n="settings">Settings</span>
+      <button id="cat-done-btn" class="nav-btn strong" type="button" data-i18n="done">Done</button>
     </div>
 
     <!-- 主頁:分組清單 -->
     <div id="settings-hub">
       <div class="cat-list settings-hub-list">
         <button class="cat-row settings-row" data-page="categories" data-title-key="categoriesSection" type="button">
-          <span class="cat-row-name" data-i18n="categoriesSection">分類</span>
+          <span class="cat-row-name" data-i18n="categoriesSection">Categories</span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="accounts" data-title-key="accountsSection" type="button">
-          <span class="cat-row-name" data-i18n="accountsSection">帳戶</span>
+          <span class="cat-row-name" data-i18n="accountsSection">Accounts</span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="budget" data-title-key="budgetRecurringTitle" type="button">
-          <span class="cat-row-name" data-i18n="budgetRecurringTitle">預算與固定支出</span>
+          <span class="cat-row-name" data-i18n="budgetRecurringTitle">Budget & Recurring</span>
+          <span class="cat-row-chevron">›</span>
+        </button>
+        <button class="cat-row settings-row" data-page="quickadd" data-title-key="quickAddTitle" type="button">
+          <span class="cat-row-name" data-i18n="quickAddTitle">Quick add (Back Tap)</span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="currency" data-title-key="currencyTitle" type="button">
-          <span class="cat-row-name" data-i18n="currencyTitle">幣別</span>
+          <span class="cat-row-name" data-i18n="currencyTitle">Currency</span>
           <span id="currency-current" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="receipt" data-title-key="receiptSection" type="button">
-          <span class="cat-row-name" data-i18n="receiptSection">收據辨識</span>
+          <span class="cat-row-name" data-i18n="receiptSection">Receipt scanning</span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="cloud" data-title-key="cloudTitle" type="button">
-          <span class="cat-row-name" data-i18n="cloudTitle">RichMama Cloud</span>
+          <span class="cat-row-name" data-i18n="cloudTitle">RichAuntie Cloud</span>
           <span id="cloud-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="lock" data-title-key="lockSection" type="button">
-          <span class="cat-row-name" data-i18n="lockSection">App 鎖</span>
+          <span class="cat-row-name" data-i18n="lockSection">App Lock</span>
           <span id="lock-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="backup" data-title-key="backupSection" type="button">
-          <span class="cat-row-name" data-i18n="backupSection">資料備份</span>
+          <span class="cat-row-name" data-i18n="backupSection">Backup</span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="about" data-title-key="aboutTitle" type="button">
-          <span class="cat-row-name" data-i18n="aboutTitle">關於</span>
+          <span class="cat-row-name" data-i18n="aboutTitle">About</span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
@@ -243,8 +252,8 @@
     <!-- 子頁:分類 -->
     <div class="settings-page" data-page="categories" hidden>
       <div class="seg" id="cat-seg">
-        <button class="seg-btn active" data-type="expense" type="button" data-i18n="expenseCats">支出分類</button>
-        <button class="seg-btn" data-type="income" type="button" data-i18n="incomeCats">收入分類</button>
+        <button class="seg-btn active" data-type="expense" type="button" data-i18n="expenseCats">Expense</button>
+        <button class="seg-btn" data-type="income" type="button" data-i18n="incomeCats">Income</button>
       </div>
       <div id="cat-list" class="cat-list"></div>
     </div>
@@ -252,27 +261,27 @@
     <!-- 子頁:帳戶 -->
     <div class="settings-page" data-page="accounts" hidden>
       <div id="acct-list" class="cat-list"></div>
-      <p class="backup-hint" data-i18n="accountsHint">收入與支出可分別記入不同帳戶;餘額 = 期初餘額 + 收入 − 支出。</p>
+      <p class="backup-hint" data-i18n="accountsHint">Route income and expenses to different accounts; balance = opening balance + income − expenses.</p>
     </div>
 
     <!-- 子頁:預算與固定支出 -->
     <div class="settings-page" data-page="budget" hidden>
-      <div class="section-label" data-i18n="monthlyBudget">每月總預算</div>
+      <div class="section-label" data-i18n="monthlyBudget">Monthly budget</div>
       <div class="cat-list">
         <label class="cat-row budget-row">
           <span class="budget-field-prefix">RM</span>
           <input id="budget-input" class="budget-inline-input num" type="text" inputmode="decimal" placeholder="0.00">
         </label>
       </div>
-      <div class="section-label" data-i18n="recurringSection">固定支出</div>
+      <div class="section-label" data-i18n="recurringSection">Recurring</div>
       <div id="recur-list" class="cat-list"></div>
-      <p class="backup-hint" data-i18n="recurringHint">每月自動產生一筆,可照常編輯或刪除。</p>
+      <p class="backup-hint" data-i18n="recurringHint">Auto-added each month; edit or delete like any entry.</p>
     </div>
 
     <!-- 子頁:幣別 -->
     <div class="settings-page" data-page="currency" hidden>
       <div id="currency-list" class="cat-list"></div>
-      <p class="backup-hint" data-i18n="currencyHint">選擇顯示貨幣。金額不會換算匯率,只改變顯示的符號與格式。</p>
+      <p class="backup-hint" data-i18n="currencyHint">Choose your display currency. Amounts are not converted by exchange rate — only the symbol and formatting change.</p>
     </div>
 
     <!-- 子頁:收據辨識 -->
@@ -280,7 +289,7 @@
       <div class="cat-list">
         <button id="pro-btn" class="cat-row pro-row" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.7 6.2.6-4.7 4.1 1.4 6.1L12 16.9 6.5 19.6l1.4-6.1L3.2 9.3l6.2-.6L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" id="pro-label" data-i18n="upgradePro">升級 Pro</span>
+          <span class="cat-row-name" id="pro-label" data-i18n="upgradePro">Upgrade to Pro</span>
           <span id="pro-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
@@ -290,45 +299,45 @@
       <div id="plan-picker" class="plan-picker" hidden>
         <button class="plan-row" type="button" data-plan="annual">
           <span class="plan-main">
-            <span class="plan-name" data-i18n="planAnnual">年繳</span>
+            <span class="plan-name" data-i18n="planAnnual">Yearly</span>
             <span class="plan-sub" id="plan-annual-sub"></span>
           </span>
           <span class="plan-price" id="plan-annual-price">—</span>
-          <span class="plan-badge" data-i18n="planBest">最划算</span>
+          <span class="plan-badge" data-i18n="planBest">Best value</span>
         </button>
         <button class="plan-row" type="button" data-plan="monthly">
           <span class="plan-main">
-            <span class="plan-name" data-i18n="planMonthly">月繳</span>
+            <span class="plan-name" data-i18n="planMonthly">Monthly</span>
           </span>
           <span class="plan-price" id="plan-monthly-price">—</span>
         </button>
         <button class="plan-row" type="button" data-plan="weekly">
           <span class="plan-main">
-            <span class="plan-name" data-i18n="planWeekly">週繳</span>
+            <span class="plan-name" data-i18n="planWeekly">Weekly</span>
           </span>
           <span class="plan-price" id="plan-weekly-price">—</span>
         </button>
       </div>
       <p class="backup-hint pro-hint" id="pro-hint"></p>
-      <button id="restore-btn" class="restore-link" type="button" data-i18n="restorePurchase" hidden>恢復購買</button>
+      <button id="restore-btn" class="restore-link" type="button" data-i18n="restorePurchase" hidden>Restore purchase</button>
       <p class="backup-hint pro-legal" id="pro-legal" hidden>
-        <a href="terms.html" target="_blank" rel="noopener" data-i18n="termsOfService">服務條款</a>
+        <a href="terms.html" target="_blank" rel="noopener" data-i18n="termsOfService">Terms of Service</a>
         ·
-        <a href="privacy.html" target="_blank" rel="noopener" data-i18n="privacyPolicy">隱私政策</a>
+        <a href="privacy.html" target="_blank" rel="noopener" data-i18n="privacyPolicy">Privacy Policy</a>
       </p>
     </div>
 
-    <!-- 子頁:RichMama Cloud -->
+    <!-- 子頁:RichAuntie Cloud -->
     <div class="settings-page" data-page="cloud" hidden>
       <div class="cat-list">
         <button id="sync-row" class="cat-row" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8M20 4v4h-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 16m0 4v-4h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" data-i18n="syncSetup">雲端同步</span>
+          <span class="cat-row-name" data-i18n="syncSetup">Cloud Sync</span>
           <span id="sync-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
-      <p class="backup-hint" data-i18n="cloudHubHint">用 RichMama Cloud 在多裝置同步;刪 App 重裝資料也還在。端到端加密,只有你的代碼能解開。</p>
+      <p class="backup-hint" data-i18n="cloudHubHint">Use RichAuntie Cloud to sync across devices; your data survives deleting and reinstalling. End-to-end encrypted — only your code can unlock it.</p>
     </div>
 
     <!-- 子頁:App 鎖 -->
@@ -336,21 +345,21 @@
       <div class="cat-list">
         <button id="lock-row" class="cat-row" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><rect x="5" y="10" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 10V7a4 4 0 0 1 8 0v3" stroke="currentColor" stroke-width="1.8"/></svg>
-          <span class="cat-row-name" data-i18n="setPin">設定 PIN 碼</span>
+          <span class="cat-row-name" data-i18n="setPin">Set passcode</span>
           <span id="lock-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
-      <p class="backup-hint" data-i18n="lockHint">開啟後每次打開 App 需輸入 PIN(僅存在本機,不含在備份中)。</p>
+      <p class="backup-hint" data-i18n="lockHint">When on, you must enter the passcode to open the app (stored on this device only, not in backups).</p>
       <div id="face-unlock-block" class="cat-list" hidden>
         <button id="face-unlock-row" class="cat-row" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.7"/><path d="M8 9v1M16 9v1M9 15s1 1.5 3 1.5S15 15 15 15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
-          <span class="cat-row-name" id="face-unlock-name" data-i18n="faceUnlockTitle">用 Face ID 解鎖</span>
+          <span class="cat-row-name" id="face-unlock-name" data-i18n="faceUnlockTitle">Unlock with Face ID</span>
           <span id="face-unlock-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
-      <p class="backup-hint" id="face-unlock-hint" data-i18n="faceUnlockHint" hidden>開啟後,打開 App 時可用 Face ID 解鎖;失敗或取消時仍可輸入 PIN。</p>
+      <p class="backup-hint" id="face-unlock-hint" data-i18n="faceUnlockHint" hidden>When on, you can unlock the app with Face ID; your PIN still works if it fails or is cancelled.</p>
     </div>
 
     <!-- 子頁:資料備份 -->
@@ -358,41 +367,46 @@
       <div class="cat-list">
         <button id="export-btn" class="cat-row cat-row-add" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M12 15V4M8 7.5 12 3.5l4 4M5 20h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" data-i18n="exportBackup">匯出 JSON 備份</span>
+          <span class="cat-row-name" data-i18n="exportBackup">Export JSON backup</span>
         </button>
         <button id="export-csv-btn" class="cat-row cat-row-add" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M4 10h16M4 15h16M10 4v16" stroke="currentColor" stroke-width="1.4"/></svg>
-          <span class="cat-row-name" data-i18n="exportCsv">匯出 CSV(試算表)</span>
+          <span class="cat-row-name" data-i18n="exportCsv">Export CSV (spreadsheet)</span>
         </button>
         <button id="import-btn" class="cat-row cat-row-add" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M8 11.5l4 4 4-4M5 20h14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" data-i18n="importBackup">匯入 JSON 備份</span>
+          <span class="cat-row-name" data-i18n="importBackup">Import JSON backup</span>
         </button>
       </div>
-      <p class="backup-hint" data-i18n="backupHint">帳目只存在這台裝置上,建議定期匯出備份。</p>
+      <p class="backup-hint" data-i18n="backupHint">Your data lives only on this device — export a backup regularly.</p>
       <p class="backup-hint" id="backup-status"></p>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
     </div>
 
     <!-- 子頁:關於 -->
+    <!-- 子頁:快速記帳(背面輕點兩下) -->
+    <div class="settings-page" data-page="quickadd" hidden>
+      <div id="quickadd-body"></div>
+    </div>
+
     <div class="settings-page" data-page="about" hidden>
       <div class="section-label" data-i18n="appSection">App</div>
       <div class="cat-list">
         <button id="refresh-btn" class="cat-row cat-row-add" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 4v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" data-i18n="updateLatest">更新到最新版</span>
+          <span class="cat-row-name" data-i18n="updateLatest">Update to latest</span>
           <span id="app-version" class="cat-row-count"></span>
         </button>
       </div>
-      <p class="backup-hint" data-i18n="updateHint">下載最新版本並重新整理(資料不受影響)。</p>
-      <div class="section-label" data-i18n="legalSection">法律</div>
+      <p class="backup-hint" data-i18n="updateHint">Download the latest version and reload. Your data is untouched.</p>
+      <div class="section-label" data-i18n="legalSection">Legal</div>
       <div class="cat-list">
         <a class="cat-row legal-row" href="privacy.html" target="_blank" rel="noopener">
-          <span class="cat-row-name" data-i18n="privacyPolicy">隱私政策</span>
+          <span class="cat-row-name" data-i18n="privacyPolicy">Privacy Policy</span>
           <span class="cat-row-chevron">›</span>
         </a>
         <a class="cat-row legal-row" href="terms.html" target="_blank" rel="noopener">
-          <span class="cat-row-name" data-i18n="termsOfService">服務條款</span>
+          <span class="cat-row-name" data-i18n="termsOfService">Terms of Service</span>
           <span class="cat-row-chevron">›</span>
         </a>
       </div>
@@ -405,8 +419,8 @@
   <section id="recon-sheet" class="sheet recon-sheet">
     <div class="grabber"></div>
     <div class="sheet-header">
-      <button id="recon-close" class="sheet-header-btn" type="button" data-i18n="done">完成</button>
-      <span class="sheet-title" data-i18n="reconcileTitle">月結對帳</span>
+      <button id="recon-close" class="sheet-header-btn" type="button" data-i18n="done">Done</button>
+      <span class="sheet-title" data-i18n="reconcileTitle">Statement reconcile</span>
       <button id="recon-add-all" class="sheet-header-btn strong" type="button" hidden></button>
     </div>
     <p id="recon-summary" class="recon-summary"></p>
@@ -417,17 +431,17 @@
   <section id="cat-editor" class="sheet cat-editor">
     <div class="grabber"></div>
     <div class="sheet-header">
-      <button id="cat-editor-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
-      <span id="cat-editor-title" class="sheet-title">編輯分類</span>
-      <button id="cat-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">儲存</button>
+      <button id="cat-editor-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">Cancel</button>
+      <span id="cat-editor-title" class="sheet-title">Edit Category</span>
+      <button id="cat-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">Save</button>
     </div>
-    <input id="cat-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="categoryName" placeholder="分類名稱" maxlength="12">
+    <input id="cat-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="categoryName" placeholder="Category name" maxlength="24">
     <div id="color-grid" class="color-grid"></div>
     <label id="cat-budget-field" class="budget-field">
       <span class="budget-field-prefix">RM</span>
-      <input id="cat-budget-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="categoryBudget" placeholder="每月預算（可空）">
+      <input id="cat-budget-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="categoryBudget" placeholder="Monthly budget (optional)">
     </label>
-    <button id="cat-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteCategory" hidden>刪除分類</button>
+    <button id="cat-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteCategory" hidden>Delete Category</button>
   </section>
 
   <!-- 帳戶編輯器 -->
@@ -435,17 +449,17 @@
   <section id="acct-editor" class="sheet cat-editor">
     <div class="grabber"></div>
     <div class="sheet-header">
-      <button id="acct-editor-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
-      <span id="acct-editor-title" class="sheet-title">編輯帳戶</span>
-      <button id="acct-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">儲存</button>
+      <button id="acct-editor-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">Cancel</button>
+      <span id="acct-editor-title" class="sheet-title">Edit account</span>
+      <button id="acct-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">Save</button>
     </div>
-    <input id="acct-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="accountName" placeholder="帳戶名稱" maxlength="12">
+    <input id="acct-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="accountName" placeholder="Account name" maxlength="12">
     <div id="acct-color-grid" class="color-grid"></div>
     <label class="budget-field">
       <span class="budget-field-prefix">RM</span>
-      <input id="acct-opening-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="openingBalance" placeholder="期初餘額（可空）">
+      <input id="acct-opening-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="openingBalance" placeholder="Opening balance (optional)">
     </label>
-    <button id="acct-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteAccount" hidden>刪除帳戶</button>
+    <button id="acct-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteAccount" hidden>Delete account</button>
   </section>
 
   <!-- 固定支出編輯器 -->
@@ -453,27 +467,27 @@
   <section id="recur-editor" class="sheet cat-editor">
     <div class="grabber"></div>
     <div class="sheet-header">
-      <button id="recur-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
-      <span id="recur-editor-title" class="sheet-title">固定支出</span>
-      <button id="recur-save" class="sheet-header-btn strong" type="button" data-i18n="save">儲存</button>
+      <button id="recur-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">Cancel</button>
+      <span id="recur-editor-title" class="sheet-title">Recurring</span>
+      <button id="recur-save" class="sheet-header-btn strong" type="button" data-i18n="save">Save</button>
     </div>
     <div class="seg seg-small recur-seg" id="recur-type-seg">
-      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">支出</button>
-      <button class="seg-btn" data-type="income" type="button" data-i18n="income">收入</button>
+      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">Expense</button>
+      <button class="seg-btn" data-type="income" type="button" data-i18n="income">Income</button>
     </div>
     <label class="budget-field">
       <span class="budget-field-prefix">RM</span>
-      <input id="recur-amount-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="amountLabel" placeholder="金額">
+      <input id="recur-amount-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="amountLabel" placeholder="Amount">
     </label>
     <div id="recur-cat-row" class="category-row"></div>
     <div class="field-row">
-      <input id="recur-note-input" class="field-input" type="text" data-i18n-ph="notePlaceholder" placeholder="備註（可空）" maxlength="60">
+      <input id="recur-note-input" class="field-input" type="text" data-i18n-ph="notePlaceholder" placeholder="Note (optional)" maxlength="60">
       <label class="day-field">
-        <span class="day-prefix" data-i18n="dayOfMonth">每月幾號</span>
+        <span class="day-prefix" data-i18n="dayOfMonth">Day of month</span>
         <input id="recur-day-input" class="field-input day-input num" type="number" min="1" max="28" value="1">
       </label>
     </div>
-    <button id="recur-delete-btn" class="cat-delete-btn" type="button" data-i18n="delete" hidden>刪除</button>
+    <button id="recur-delete-btn" class="cat-delete-btn" type="button" data-i18n="delete" hidden>Delete</button>
   </section>
 
   <!-- 雲端同步設定 -->
@@ -481,27 +495,27 @@
   <section id="sync-sheet" class="sheet cat-editor">
     <div class="grabber"></div>
     <div class="sheet-header">
-      <button id="sync-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">取消</button>
-      <span class="sheet-title" data-i18n="cloudTitle">RichMama Cloud</span>
+      <button id="sync-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">Cancel</button>
+      <span class="sheet-title" data-i18n="cloudTitle">RichAuntie Cloud</span>
       <span style="min-width:52px"></span>
     </div>
-    <p class="sync-intro" data-i18n="syncIntro"></p>
-    <div class="sync-code-label" data-i18n="syncCodeLabel">同步碼</div>
+    <p class="sync-intro" data-i18n="syncIntro">Sync with one "sync code". On a new phone, or after deleting and reinstalling, enter the same code to restore. Data is encrypted on your device — the server never sees it.</p>
+    <div class="sync-code-label" data-i18n="syncCodeLabel">Sync code</div>
     <div class="sync-code-field">
       <input id="sync-code-input" class="field-input" type="text" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false">
-      <button id="sync-generate" class="sync-inline-btn" type="button" data-i18n="syncGenerate">產生新的</button>
+      <button id="sync-generate" class="sync-inline-btn" type="button" data-i18n="syncGenerate">Generate new</button>
     </div>
-    <p class="sync-warn" id="sync-warn" data-i18n="syncSavedWarn"></p>
-    <button id="sync-enable" class="save-btn" type="button" data-i18n="syncEnable">啟用同步</button>
-    <button id="sync-email-backup" class="cat-delete-btn sync-secondary" type="button" data-i18n="syncEmailBackup">把代碼 email 給我自己備份</button>
-    <button id="sync-copy" class="cat-delete-btn sync-secondary" type="button" data-i18n="syncCopy" hidden>複製同步碼</button>
-    <button id="sync-disable" class="cat-delete-btn" type="button" data-i18n="syncDisable" hidden>停止同步</button>
+    <p class="sync-warn" id="sync-warn" data-i18n="syncSavedWarn">Copy or write down your sync code first — if lost, the data cannot be decrypted.</p>
+    <button id="sync-enable" class="save-btn" type="button" data-i18n="syncEnable">Enable sync</button>
+    <button id="sync-email-backup" class="cat-delete-btn sync-secondary" type="button" data-i18n="syncEmailBackup">Email this code to myself as a backup</button>
+    <button id="sync-copy" class="cat-delete-btn sync-secondary" type="button" data-i18n="syncCopy" hidden>Copy sync code</button>
+    <button id="sync-disable" class="cat-delete-btn" type="button" data-i18n="syncDisable" hidden>Stop syncing</button>
   </section>
 
   <!-- 分類明細(點報表分類進入) -->
   <section id="detail-modal" class="modal detail-level">
     <div class="nav-bar modal-nav">
-      <button id="detail-back-btn" class="nav-btn left" type="button">‹ <span data-i18n="back">返回</span></button>
+      <button id="detail-back-btn" class="nav-btn left" type="button">‹ <span data-i18n="back">Back</span></button>
       <span id="detail-title" class="modal-title"></span>
       <span class="nav-spacer"></span>
     </div>
@@ -531,7 +545,7 @@
         <button class="key lock-key key-del" data-key="del" type="button">⌫</button>
       </div>
       <button id="lock-face-btn" class="lock-face-btn" type="button" hidden></button>
-      <button id="lock-done" class="save-btn lock-done" type="button" data-i18n="done" hidden>完成</button>
+      <button id="lock-done" class="save-btn lock-done" type="button" data-i18n="done" hidden>Done</button>
     </div>
   </div>
 

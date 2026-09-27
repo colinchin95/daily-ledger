@@ -1,14 +1,31 @@
 {
-  "name": "RichMama",
-  "short_name": "RichMama",
-  "description": "Private, local-first expense tracking with receipt scanning. Your data stays on your device.",
+  "name": "RichAuntie: Expense Tracker",
+  "short_name": "RichAuntie",
+  "description": "Malaysia's private expense tracker and budget planner. Track spending in RM, set budgets, scan receipts and import bank statements. Your data stays on your device.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
-  "lang": "en",
+  "background_color": "#EDE4D5",
+  "theme_color": "#EDE4D5",
+  "lang": "en-MY",
+  "categories": ["finance", "productivity", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Log expense",
+      "short_name": "Expense",
+      "description": "Open straight to a new expense",
+      "url": "./?action=add",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Log income",
+      "short_name": "Income",
+      "description": "Open straight to a new income entry",
+      "url": "./?action=add&type=income",
+      "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },

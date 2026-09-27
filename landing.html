@@ -1,14 +1,84 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-MY">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>RichMama — Private, AI-powered expense tracking</title>
-<meta name="description" content="RichMama is a private, local-first expense tracker with AI receipt scanning. Free, no account, your data stays on your device.">
-<meta property="og:title" content="RichMama — Private expense tracking with AI receipt scanning">
-<meta property="og:description" content="Snap a receipt, AI fills it in. Budgets, reports, encrypted sync. Free, no account.">
-<meta property="og:image" content="icons/icon-512.png">
+<title>RichAuntie — Expense Tracker &amp; Budget App for Malaysia (RM)</title>
+<meta name="description" content="RichAuntie is a free, private expense tracker and budget planner made for Malaysia. Track spending in RM, log Mamak, Grab, petrol and toll in seconds, scan receipts with AI, import bank &amp; credit card statements, and see spending vs income trends. No account needed.">
+<meta name="keywords" content="expense tracker Malaysia, budget app Malaysia, money manager, spending tracker, budget planner, personal finance app, daily expense tracker, expense manager, bookkeeping app, money tracker RM, receipt scanner, bank statement import, credit card tracker, savings tracker, income tracker, bill tracker, household budget, cash flow, aplikasi rekod perbelanjaan, aplikasi bajet, pengurus wang, 记账 App, 记账, 理财, 马来西亚 记账">
+<link rel="canonical" href="https://colinchin95.github.io/daily-ledger/landing.html">
+<meta name="robots" content="index, follow">
+<meta name="theme-color" content="#EDE4D5">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="RichAuntie">
+<meta property="og:locale" content="en_MY">
+<meta property="og:title" content="RichAuntie — Malaysia's private expense tracker">
+<meta property="og:description" content="Log an expense in 2 seconds (even with a double-tap on the back of your phone). Budgets, sub-categories, spending &amp; income trends, AI receipt scanning. Your data stays on your device.">
+<meta property="og:image" content="https://colinchin95.github.io/daily-ledger/icons/icon-1024.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="RichAuntie — Expense Tracker &amp; Budget App for Malaysia">
+<meta name="twitter:description" content="Private money tracker in RM. Budgets, trends, AI receipt scanning, bank statement import.">
+<meta name="apple-itunes-app" content="app-id=6781631334">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "name": "RichAuntie: Expense Tracker",
+      "alternateName": ["RichAuntie", "RichAuntie Budget App"],
+      "applicationCategory": "FinanceApplication",
+      "operatingSystem": "iOS, Android, Web",
+      "description": "A private expense tracker and budget planner for Malaysia. Track spending and income in RM with sub-categories, budgets, spending vs income trends, AI receipt scanning and bank / credit card statement import.",
+      "inLanguage": "en-MY",
+      "countriesSupported": "MY",
+      "image": "https://colinchin95.github.io/daily-ledger/icons/icon-1024.png",
+      "url": "https://colinchin95.github.io/daily-ledger/landing.html",
+      "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+      "featureList": [
+        "Expense and income tracking in Malaysian Ringgit (RM)",
+        "Malaysian sub-categories: Mamak, hawker, groceries, petrol, Grab, toll, parking, LRT/MRT",
+        "Double-tap the back of the phone to log an expense (iPhone Back Tap)",
+        "Monthly budgets and per-category budgets",
+        "Spending vs income trend line chart",
+        "Search and filter by note",
+        "AI receipt scanning",
+        "Bank and credit card statement import with AI categorisation",
+        "Multiple accounts: cash, bank, Touch 'n Go eWallet",
+        "End-to-end encrypted sync, CSV export, app lock"
+      ]
+    },
+    {
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the best free expense tracker app in Malaysia?",
+          "acceptedAnswer": { "@type": "Answer", "text": "RichAuntie is a free expense tracker built for Malaysia: amounts in RM, local categories like Mamak, petrol, toll and Grab, Touch 'n Go as an account, budgets and spending trends. It needs no account and keeps your data on your phone." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I log an expense without opening the app?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Yes. On iPhone, link RichAuntie's Quick Add Expense shortcut to Back Tap and double-tap the back of your phone to jump straight to the keypad. You can also say \"Hey Siri, log expense in RichAuntie\". On Android, long-press the app icon and choose Log expense." }
+        },
+        {
+          "@type": "Question",
+          "name": "Can RichAuntie read my Maybank, CIMB or credit card statement?",
+          "acceptedAnswer": { "@type": "Answer", "text": "With Pro you can import a CSV, PDF or screenshot of a bank or credit card statement. AI turns cryptic merchant codes into readable names, suggests categories and finds transactions you forgot to log." }
+        },
+        {
+          "@type": "Question",
+          "name": "Is my financial data private?",
+          "acceptedAnswer": { "@type": "Answer", "text": "Your ledger is stored on your device. Optional cloud sync is end-to-end encrypted, so no one else can read it. Receipt or statement images are only sent to an AI service when you choose to scan them." }
+        }
+      ]
+    }
+  ]
+}
+</script>
 <style>
   :root{
     --bg:#000; --surface:#15151b; --surface2:#1f1f28; --text:#ece9e1; --text2:#9b988f;
@@ -78,41 +148,66 @@
 
 <header>
   <div class="wrap">
-    <img class="logo" src="icons/icon-512.png" alt="RichMama">
-    <h1>Track every cent.<br><span class="g">Privately.</span></h1>
-    <p class="sub">RichMama is a beautifully simple expense tracker. Snap a receipt and AI fills it in. Your data stays on your device — no account, and your ledger is never shared. Go Pro to remove ads.</p>
+    <img class="logo" src="icons/icon-512.png" alt="RichAuntie expense tracker app icon" width="96" height="96">
+    <h1>Malaysia's expense tracker.<br><span class="g">Every sen, in two taps.</span></h1>
+    <p class="sub">RichAuntie is a simple, private money tracker and budget planner made for how Malaysians actually spend — Mamak, petrol, toll, Grab, Shopee. Double-tap the back of your phone to log an expense, see where your ringgit goes, and hit your savings goals. No account, your data stays on your device.</p>
     <div class="cta-row">
-      <a class="btn" href="./">Open RichMama →</a>
-      <a class="btn ghost" href="#install">How to install</a>
+      <a class="btn" href="./">Open RichAuntie →</a>
+      <a class="btn ghost" href="#features">See features</a>
     </div>
-    <div class="badges"><b>Free</b> · No account · <b>Private by design</b> · Works offline</div>
+    <div class="badges"><b>Free</b> · Amounts in <b>RM</b> · No account · <b>Private by design</b> · Works offline</div>
   </div>
 </header>
 
-<section>
+<section id="features">
   <div class="wrap">
-    <h2>Why RichMama</h2>
-    <p class="lead">Most money apps sell your data or bury you in ads. RichMama does the opposite.</p>
+    <h2>Everything a budget app should do</h2>
+    <p class="lead">A daily expense tracker, income tracker and budget planner in one — without selling your data.</p>
     <div class="grid">
       <div class="card">
-        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9.5 12.5 2 2 3.5-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <h3>Private by design</h3>
-        <p>Your records live on your device. Optional cloud sync is end-to-end encrypted — even we can't read it.</p>
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><rect x="7" y="2.5" width="10" height="19" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 6.5h3M12 12v4M10 14h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <h3>Back Tap quick add</h3>
+        <p>Double-tap the back of your iPhone (or say “Hey Siri, log expense”) and land straight on the keypad. On Android, long-press the icon.</p>
       </div>
       <div class="card">
-        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M4 8.5 5.5 7 7 8.5 8.5 7 10 8.5 11.5 7 13 8.5 14.5 7 16 8.5 17.5 7 19 8.5V20l-2-1.2L13 20l-2-1.2L9 20l-2-1.2L4 20V8.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11.5h9M7 14.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        <h3>AI receipt scanning</h3>
-        <p>Snap any receipt — AI fills in the amount, date, merchant, and category. No more typing.</p>
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M4 5h7v7H4zM13 5h7v4h-7zM13 11h7v8h-7zM4 14h7v5H4z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+        <h3>Malaysian sub-categories</h3>
+        <p>Food › Mamak, Hawker &amp; Kopitiam, Groceries. Transport › Petrol, Grab, Toll, Parking, LRT/MRT. Add your own sub-categories anytime.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M3 17l5-5 4 3 8-8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 20h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <h3>Spending &amp; income trends</h3>
+        <p>A 6- or 12-month line chart of spending vs income shows which months you overspent. Plus daily charts and category breakdowns.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <h3>Filter by note</h3>
+        <p>Tap “Grab” or “Shopee” to see every matching entry with its total. Find out exactly how much that teh tarik habit costs.</p>
       </div>
       <div class="card">
         <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M5 20v-7M12 20V4M19 20v-5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-        <h3>Budgets &amp; reports</h3>
-        <p>Monthly budgets with overspend alerts, category breakdowns, and a 6-month spending trend.</p>
+        <h3>Budgets that warn you</h3>
+        <p>Set a monthly budget and per-category budgets. See what's left before payday, and get warned before you overspend.</p>
       </div>
       <div class="card">
-        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3v6m0 0 3-3m-3 3-3-3M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <h3>Yours to keep</h3>
-        <p>One-tap JSON / CSV export. Bilingual (English &amp; 繁中). Installs like a real app, works fully offline.</p>
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M3 7h18v12H3z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M3 11h18M7 15h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        <h3>Cash, bank &amp; Touch 'n Go</h3>
+        <p>Track multiple accounts and wallets. Pay from your eWallet, get paid into your bank, and always know your net worth.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M4 8.5 5.5 7 7 8.5 8.5 7 10 8.5 11.5 7 13 8.5 14.5 7 16 8.5 17.5 7 19 8.5V20l-2-1.2L13 20l-2-1.2L9 20l-2-1.2L4 20V8.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 11.5h9M7 14.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <h3>AI receipt scanner</h3>
+        <p>Snap a receipt — AI fills in the amount, date, merchant and category for you.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <h3>Bank &amp; credit card statements</h3>
+        <p>Import a statement (CSV, PDF or screenshot). AI renames cryptic merchant codes, categorises them and finds what you forgot to log.</p>
+      </div>
+      <div class="card">
+        <svg class="ic" viewBox="0 0 24 24" fill="none"><path d="M12 3 5 6v5c0 4.2 2.9 7.6 7 9 4.1-1.4 7-4.8 7-9V6l-7-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9.5 12.5 2 2 3.5-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <h3>Private by design</h3>
+        <p>No sign-up. Your ledger lives on your phone; optional sync is end-to-end encrypted. App lock with Face ID, CSV export anytime.</p>
       </div>
     </div>
   </div>
@@ -121,16 +216,16 @@
 <section style="background:var(--surface)">
   <div class="wrap">
     <h2>Simple pricing</h2>
-    <p class="lead">Everything you need is free. Pay only if you want unlimited AI scanning.</p>
+    <p class="lead">Tracking, budgets and reports are free forever. Go Pro for unlimited AI and no ads.</p>
     <div class="price-grid">
       <div class="plan">
         <div class="name">Free</div>
         <div class="amt">$0</div>
         <ul>
-          <li>Unlimited manual entries</li>
-          <li>Budgets, reports &amp; trends</li>
-          <li>Encrypted cloud sync</li>
-          <li>JSON / CSV backup</li>
+          <li>Unlimited entries &amp; accounts</li>
+          <li>Sub-categories, budgets &amp; trends</li>
+          <li>Back Tap / Siri quick add</li>
+          <li>Encrypted sync &amp; CSV backup</li>
           <li>5 AI receipt scans / month</li>
         </ul>
       </div>
@@ -138,48 +233,56 @@
         <div class="name" style="color:var(--gold)">Pro</div>
         <div class="amt">$2.99<span> / month</span></div>
         <ul>
-          <li>Everything in Free</li>
+          <li>Everything in Free, no ads</li>
           <li><b>Unlimited</b> AI receipt scanning</li>
-          <li>Support an indie, privacy-first app</li>
+          <li>Bank &amp; credit card statement import</li>
           <li>Cancel anytime</li>
         </ul>
       </div>
     </div>
-    <p class="lead" style="margin-top:24px;font-size:14px">Prefer to bring your own Anthropic API key? Do that for free, unlimited scans — right inside the app.</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2>Questions</h2>
+    <div class="grid">
+      <div class="card"><h3>Is it really free?</h3><p>Yes. Expense tracking, income tracking, budgets, sub-categories, trends and backups are free. Pro adds unlimited AI and removes ads.</p></div>
+      <div class="card"><h3>How does Back Tap work?</h3><p>In the Shortcuts app add “Quick Add Expense” from RichAuntie, then choose it in Settings → Accessibility → Touch → Back Tap → Double Tap.</p></div>
+      <div class="card"><h3>Which banks work?</h3><p>Any bank or credit card that gives you a CSV, PDF or a readable screenshot — Maybank, CIMB, Public Bank, RHB, Hong Leong and more.</p></div>
+      <div class="card"><h3>Where is my data?</h3><p>On your device. Nothing leaves it unless you turn on encrypted sync or choose to scan a receipt or statement.</p></div>
+    </div>
   </div>
 </section>
 
 <section id="install">
   <div class="wrap">
-    <h2>Install in 10 seconds</h2>
-    <p class="lead">RichMama is a web app — no app store needed. Add it to your home screen and it behaves like a native app.</p>
+    <h2>Get RichAuntie</h2>
+    <p class="lead">Available on iPhone and Android, or use it right in your browser — add it to your home screen and it works like a native app.</p>
     <div class="steps">
       <div class="step">
         <div class="os"> iPhone / iPad</div>
         <ol>
-          <li>Open RichMama in <b>Safari</b></li>
-          <li>Tap the <b>Share</b> button</li>
-          <li>Tap <b>Add to Home Screen</b></li>
+          <li>Search <b>RichAuntie</b> on the App Store</li>
+          <li>Or open this site in <b>Safari</b> → Share → <b>Add to Home Screen</b></li>
         </ol>
       </div>
       <div class="step">
         <div class="os">🤖 Android</div>
         <ol>
-          <li>Open RichMama in <b>Chrome</b></li>
-          <li>Tap the <b>⋮</b> menu</li>
-          <li>Tap <b>Install app</b></li>
+          <li>Search <b>RichAuntie</b> on Google Play</li>
+          <li>Or open in <b>Chrome</b> → ⋮ → <b>Install app</b></li>
         </ol>
       </div>
       <div class="step">
         <div class="os">💻 Desktop</div>
         <ol>
-          <li>Open RichMama in <b>Chrome / Edge</b></li>
+          <li>Open RichAuntie in <b>Chrome / Edge</b></li>
           <li>Click the <b>Install</b> icon in the address bar</li>
-          <li>Launch it like any app</li>
         </ol>
       </div>
     </div>
-    <div class="cta-row" style="margin-top:34px"><a class="btn" href="./">Open RichMama →</a></div>
+    <div class="cta-row" style="margin-top:34px"><a class="btn" href="./">Open RichAuntie →</a></div>
   </div>
 </section>
 
@@ -190,8 +293,8 @@
       <a href="privacy.html">Privacy</a>·
       <a href="terms.html">Terms</a>
     </div>
-    <p style="margin:14px 0 0">© 2026 RichMama</p>
-    <p class="disclaimer">RichMama is a personal-finance tool, not financial advice. Receipt scanning sends the photo to a third-party AI service for processing; see the Privacy Policy.</p>
+    <p style="margin:14px 0 0">© 2026 RichAuntie · Made in Malaysia</p>
+    <p class="disclaimer">RichAuntie is a personal-finance tool, not financial advice. Receipt and statement scanning send the image to a third-party AI service for processing; see the Privacy Policy.</p>
   </div>
 </footer>
 

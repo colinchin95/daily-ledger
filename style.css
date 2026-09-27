@@ -1,4 +1,4 @@
-/* RichMama — 香檳絲綢主題(取色自 App 圖示:絲綢、金幣、酒紅指甲) */
+/* RichAuntie — 香檳絲綢主題(取色自 App 圖示:絲綢、金幣、酒紅指甲) */
 :root {
   --bg: #EDE4D5;
   --surface: #F8F3EA;
@@ -541,6 +541,34 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   background: rgba(217, 182, 77, 0.12);
 }
 
+/* 子分類列:選了有子分類的母分類才出現,比母分類 chip 小一號 */
+.subcat-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 0 2px 12px;
+  margin-top: -4px;
+  scrollbar-width: none;
+}
+.subcat-row[hidden] { display: none; }
+.subcat-row::-webkit-scrollbar { display: none; }
+.sub-chip {
+  flex: none;
+  padding: 5px 11px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-3);
+  background: transparent;
+  border: 1px solid var(--separator);
+  border-radius: 999px;
+  cursor: pointer;
+}
+.sub-chip.selected {
+  color: var(--text);
+  border-color: var(--gold);
+  background: rgba(217, 182, 77, 0.12);
+}
+
 /* 掃描收據 */
 .receipt-btn {
   display: flex;
@@ -683,6 +711,14 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 
 .detail-summary .detail-total.income-text { color: var(--green); }
 
+.sub-breakdown { width: 100%; margin-top: 14px; text-align: left; }
+.sub-breakdown-title { font-size: 12px; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+.sub-breakdown-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; font-size: 14px; }
+.sub-breakdown-row .sub-name { flex: 0 0 38%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-2); }
+.sub-bar-track { flex: 1; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.sub-bar { display: block; height: 100%; border-radius: 3px; }
+.sub-breakdown-row .sub-amt { flex: none; font-variant-numeric: tabular-nums; }
+
 .detail-row { gap: 10px; }
 .detail-date {
   flex: none;
@@ -762,6 +798,11 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .cat-row-name { flex: 1; }
 .cat-row-count { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
 .cat-row-chevron { color: var(--text-3); font-size: 17px; }
+
+/* 設定頁的子分類:縮排、字小一號 */
+.cat-row-sub { padding-left: 44px; font-size: 15px; color: var(--text-2); }
+.cat-row-sub.cat-row-addsub { color: var(--gold); font-size: 14px; }
+.cat-row-addsub .add-mark { width: 12px; text-align: center; }
 
 .cat-row-add { color: var(--gold); }
 .cat-row-add .add-mark {
@@ -1029,6 +1070,68 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 
 .trend-month { font-size: 11px; color: var(--text-3); }
 .trend-col.current .trend-month { color: var(--text); font-weight: 600; }
+
+/* 折線趨勢:支出(金)vs 收入(綠) */
+.trend-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.trend-head .trend-title { margin-bottom: 0; }
+.trend-range { display: flex; background: var(--surface-2); border-radius: 8px; padding: 2px; }
+.trend-range-btn {
+  border: none; background: none; font: inherit; font-size: 12px; color: var(--text-2);
+  padding: 3px 10px; border-radius: 6px; cursor: pointer;
+}
+.trend-range-btn.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
+.trend-legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
+.trend-legend .lg i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
+.trend-legend .lg-spent i { background: var(--gold-bright); }
+.trend-legend .lg-income i { background: var(--green); }
+.trend-legend b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.trend-legend .lg-income b { color: var(--green); }
+.trend-legend .lg-month { margin-left: auto; color: var(--text-3); }
+.trend-svg { display: block; overflow: visible; }
+.tr-grid { stroke: var(--separator); stroke-width: 1; stroke-dasharray: 2 3; }
+.tr-axis { stroke: var(--separator); stroke-width: 1; }
+.tr-cursor { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 3 3; }
+.tr-ylbl, .tr-xlbl { font-size: 10px; fill: var(--text-3); font-family: inherit; font-variant-numeric: tabular-nums; }
+.tr-xlbl.on { fill: var(--text); font-weight: 600; }
+.tr-line { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.tr-line.tr-spent { stroke: var(--gold-bright); }
+.tr-line.tr-income { stroke: var(--green); }
+.tr-area { fill: var(--gold-bright); opacity: 0.12; }
+.tr-dot { stroke: var(--surface); stroke-width: 1.5; }
+.tr-dot.tr-spent { fill: var(--gold-bright); }
+.tr-dot.tr-income { fill: var(--green); }
+.tr-hit { fill: transparent; cursor: pointer; }
+
+/* ---------- 備註篩選 ---------- */
+.note-chips {
+  display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none;
+  margin: -6px 0 12px; padding: 0 1px;
+}
+.note-chips[hidden] { display: none; }
+.note-chips::-webkit-scrollbar { display: none; }
+.note-chip {
+  flex: none; display: flex; align-items: center; gap: 6px;
+  padding: 5px 10px; font: inherit; font-size: 13px; color: var(--text-2);
+  background: var(--surface); border: 1px solid var(--separator); border-radius: 999px; cursor: pointer;
+}
+.note-chip-n { font-size: 11px; color: var(--text-3); }
+.note-chip.selected { color: var(--text); border-color: var(--gold); background: rgba(217, 182, 77, 0.12); }
+.search-summary { font-size: 13px; color: var(--text-2); margin: -4px 2px 12px; font-variant-numeric: tabular-nums; }
+.search-summary[hidden] { display: none; }
+
+.notes-card { padding: 16px; }
+.notes-card[hidden] { display: none; }
+.note-row {
+  display: block; width: 100%; border: none; background: none; font: inherit; color: inherit;
+  text-align: left; padding: 7px 0; cursor: pointer;
+}
+.note-row-top { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
+.note-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.note-row-n { font-size: 12px; color: var(--text-3); }
+.note-row-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
+.note-row-track { display: block; height: 5px; margin-top: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.note-row-bar { display: block; height: 100%; border-radius: 3px; background: var(--gold-bright); }
+.note-row-bar.income { background: var(--green); }
 
 /* ---------- 固定支出 ---------- */
 .recur-row { gap: 12px; }
@@ -1520,3 +1623,22 @@ body.has-ad .sheet {
 body.has-ad .modal {
   padding-bottom: calc(20px + var(--ad-h, 0px));
 }
+
+/* ---------- 快速記帳設定頁 ---------- */
+.qa-intro { font-size: 15px; color: var(--text); padding: 4px 16px 4px; margin: 0; line-height: 1.5; }
+.qa-steps { margin: 10px 0 6px; padding: 0 16px 0 38px; font-size: 14px; color: var(--text-2); line-height: 1.55; }
+.qa-steps li { margin-bottom: 8px; }
+.qa-steps b { color: var(--text); font-weight: 600; }
+.qa-actions { margin-top: 14px; }
+.qa-toggle-row { cursor: pointer; }
+.qa-switch {
+  appearance: none; -webkit-appearance: none; flex: none; position: relative;
+  width: 44px; height: 26px; border-radius: 13px; background: var(--surface-3);
+  transition: background 0.2s ease; cursor: pointer; margin: 0;
+}
+.qa-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25); transition: transform 0.2s var(--spring);
+}
+.qa-switch:checked { background: var(--green); }
+.qa-switch:checked::after { transform: translateX(18px); }

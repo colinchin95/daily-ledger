@@ -8,34 +8,66 @@ const KEY_META = 'meta';
 const KEY_RECURRING = 'recurring';
 const KEY_ACCOUNTS = 'accounts';
 
-// 預設帳戶:現金 + 銀行。名稱跟著介面語言(app.js 的 ACCOUNT_NAMES),
-// 使用者改名後(renamed=true)才用自訂名稱。
+// 預設帳戶(新安裝才會用到)。顯示名稱由 app.js 的 ACCOUNT_NAMES 依 id 決定。
 const DEFAULT_ACCOUNTS = [
-  { id: 'cash', name: '現金', color: '#6E8B4A', openingCents: 0 },
-  { id: 'bank', name: '銀行', color: '#566B96', openingCents: 0 },
+  { id: 'cash', name: 'Cash',         color: '#6E8B4A', openingCents: 0 },
+  { id: 'bank', name: 'Bank',         color: '#566B96', openingCents: 0 },
+  { id: 'tng',  name: "Touch 'n Go",  color: '#3E7C8A', openingCents: 0 },
 ];
 
 const DEFAULT_EXPENSE_CATEGORIES = [
-  { id: 'food',      name: '餐飲', color: '#B5763C', type: 'expense' },
-  { id: 'transport', name: '交通', color: '#566B96', type: 'expense' },
-  { id: 'shopping',  name: '購物', color: '#B4697A', type: 'expense' },
-  { id: 'fun',       name: '娛樂', color: '#96577E', type: 'expense' },
-  { id: 'home',      name: '居家', color: '#4E8C7B', type: 'expense' },
-  { id: 'medical',   name: '醫療', color: '#A6452F', type: 'expense' },
-  { id: 'other',     name: '其他', color: '#8A8078', type: 'expense' },
+  { id: 'food',      name: 'Food',          color: '#B5763C', type: 'expense' },
+  { id: 'transport', name: 'Transport',     color: '#566B96', type: 'expense' },
+  { id: 'shopping',  name: 'Shopping',      color: '#B4697A', type: 'expense' },
+  { id: 'fun',       name: 'Entertainment', color: '#96577E', type: 'expense' },
+  { id: 'home',      name: 'Home',          color: '#4E8C7B', type: 'expense' },
+  { id: 'medical',   name: 'Medical',       color: '#A6452F', type: 'expense' },
+  { id: 'other',     name: 'Other',         color: '#8A8078', type: 'expense' },
 ];
 
+// 子分類(只有一層)。在地化:照馬來西亞人實際花錢的方式分。
+// id 固定,多台裝置各自初始化時同步合併也不會重複。
+const DEFAULT_SUBCATEGORIES = [
+  ['food', 'food-mamak', 'Mamak'],
+  ['food', 'food-hawker', 'Hawker & Kopitiam'],
+  ['food', 'food-groceries', 'Groceries'],
+  ['food', 'food-drinks', 'Coffee & Drinks'],
+  ['food', 'food-delivery', 'Food Delivery'],
+  ['transport', 'transport-petrol', 'Petrol'],
+  ['transport', 'transport-ehailing', 'Grab / e-hailing'],
+  ['transport', 'transport-toll', 'Toll'],
+  ['transport', 'transport-parking', 'Parking'],
+  ['transport', 'transport-public', 'LRT / MRT / Bus'],
+  ['shopping', 'shopping-online', 'Online Shopping'],
+  ['shopping', 'shopping-clothing', 'Clothing'],
+  ['shopping', 'shopping-personal', 'Personal Care'],
+  ['fun', 'fun-movies', 'Movies'],
+  ['fun', 'fun-subscriptions', 'Subscriptions'],
+  ['fun', 'fun-travel', 'Travel'],
+  ['home', 'home-rent', 'Rent / Loan'],
+  ['home', 'home-electricity', 'Electricity'],
+  ['home', 'home-water', 'Water'],
+  ['home', 'home-internet', 'Internet & Phone'],
+  ['medical', 'medical-clinic', 'Clinic'],
+  ['medical', 'medical-pharmacy', 'Pharmacy'],
+  ['medical', 'medical-insurance', 'Insurance'],
+].map(([parentId, id, name]) => {
+  const parent = DEFAULT_EXPENSE_CATEGORIES.find((c) => c.id === parentId);
+  return { id, name, color: parent.color, type: 'expense', parentId };
+});
+
 const DEFAULT_INCOME_CATEGORIES = [
-  { id: 'salary',       name: '薪資',   color: '#6E8B4A', type: 'income' },
-  { id: 'bonus',        name: '獎金',   color: '#C69A4E', type: 'income' },
-  { id: 'investment',   name: '投資',   color: '#3E7C8A', type: 'income' },
-  { id: 'other-income', name: '其他收入', color: '#8A8078', type: 'income' },
+  { id: 'salary',       name: 'Salary',       color: '#6E8B4A', type: 'income' },
+  { id: 'bonus',        name: 'Bonus',        color: '#C69A4E', type: 'income' },
+  { id: 'investment',   name: 'Investment',   color: '#3E7C8A', type: 'income' },
+  { id: 'other-income', name: 'Other Income', color: '#8A8078', type: 'income' },
 ];
 
 export async function getCategories() {
   let cats = await get(KEY_CATEGORIES);
   if (!cats || !cats.length) {
-    cats = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
+    // 新安裝:整套預設(含馬來西亞子分類)。既有用戶不動,避免改到他們的資料。
+    cats = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_SUBCATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
     await set(KEY_CATEGORIES, cats);
     return cats;
   }
