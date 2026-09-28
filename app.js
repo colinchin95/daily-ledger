@@ -206,20 +206,15 @@ const STRINGS = {
     // Receipt scanning
     scanReceipt: 'Scan receipt',
     importStatement: 'Import Bank / Credit card statement',
-    planAnnual: 'Yearly',
-    planMonthly: 'Monthly',
-    planWeekly: 'Weekly',
+    planSixMonth: '6 months',
     stmtStepRead: 'Reading file',
     stmtStepAnalyse: 'Analysing with AI',
     stmtStepMatch: 'Matching entries',
     stmtStepOf: (a, b) => `${a} / ${b}`,
-    unitWeek: 'week',
-    unitMonth: 'month',
-    unitYear: 'year',
+    unitSixMonths: '6 months',
     aiConsentReceipt: 'Scanning a receipt sends this photo over an encrypted connection to our processing endpoint, then on to Anthropic (Claude) to read the amount, date and merchant. The image is not stored and is not used to train models. Continue?',
     aiConsentStatement: 'Importing a statement sends this file over an encrypted connection to our processing endpoint, then on to Anthropic (Claude) to extract the transactions. The file is not stored and is not used to train models. Continue?',
-    planBest: 'Best value',
-    planSave: (pct) => `Save ${pct}% vs monthly`,
+    planPerMonth: (x) => `Just ${x} a month`,
 
     reconcileTitle: 'Statement reconcile',
     reconBusy: 'Reading…',
@@ -2993,7 +2988,7 @@ const REVENUECAT_KEY = (window.Capacitor?.getPlatform?.() === 'android')
   ? REVENUECAT_ANDROID_KEY : REVENUECAT_IOS_KEY;
 let isPro = false;
 let proUntil = null;
-let proPriceStr = null; // 原生 paywall 顯示的在地化價格（如 RM12.90 / US$2.99）
+let proPriceStr = null; // 原生 paywall 顯示的在地化價格（如 RM19.90）
 
 // 懶載入 IAP shim（只在 iOS 殼層、且只載一次）。Web 永不觸發。
 let _iapMod = null;
@@ -3046,8 +3041,7 @@ async function iapReady() {
 }
 
 // 訂閱週期文字:Apple 3.1.2 要求購買點清楚標示「長度」,且說明不可與實際方案不符
-const PLAN_UNIT_KEY = { weekly: 'unitWeek', monthly: 'unitMonth', annual: 'unitYear' };
-const planUnit = (plan) => t(PLAN_UNIT_KEY[plan] || 'unitMonth');
+const planUnit = () => t('unitSixMonths');
 
 function updateProUI() {
   const label = $('#pro-label');
@@ -3066,7 +3060,7 @@ function updateProUI() {
       // 原生:方案由下方 picker 選,按鈕本身只當「購買」動作
       label.textContent = t('upgradeProGeneric');
       const isAndroid = window.Capacitor?.getPlatform?.() === 'android';
-      hint.textContent = t(isAndroid ? 'proPitchIAPAndroid' : 'proPitchIAP', planUnit(selectedPlan));
+      hint.textContent = t(isAndroid ? 'proPitchIAPAndroid' : 'proPitchIAP', planUnit());
     } else {
       label.textContent = t('upgradePro');
       hint.textContent = t('proPitch');
@@ -3163,57 +3157,26 @@ async function checkEntitlement() {
 async function renderPlanPicker() {
   const picker = $('#plan-picker');
   if (!IS_NATIVE || isPro) { picker.hidden = true; return; }
-  let plans = null;
+  let info = null;
   try {
     const m = await iapReady();
-    plans = await m.getPlans();
-  } catch {
-    picker.hidden = true;
-    return;
+    info = (await m.getPlans()).sixmonth;
+  } catch {}
+  if (!info || !info.priceString) { picker.hidden = true; return; }
+  // 「RM19.90 / 6 months」——價格 + 週期一起顯示(3.1.2)
+  $('#plan-sixmonth-price').textContent = `${info.priceString} / ${planUnit()}`;
+  // 換算月費當輔助說明;幣別用 StoreKit 回的,不自己寫死 RM
+  let perMonth = '';
+  if (typeof info.price === 'number' && info.currencyCode) {
+    try {
+      perMonth = new Intl.NumberFormat('en-MY', { style: 'currency', currency: info.currencyCode }).format(info.price / 6);
+    } catch {}
   }
-  const available = [];
-  for (const plan of ['annual', 'monthly', 'weekly']) {
-    const row = picker.querySelector(`[data-plan="${plan}"]`);
-    const info = plans && plans[plan];
-    if (!info || !info.priceString) { row.hidden = true; continue; }
-    row.hidden = false;
-    available.push(plan);
-    // 「RM 39.90 / 年」——價格 + 週期一起顯示
-    $(`#plan-${plan}-price`).textContent = `${info.priceString} / ${planUnit(plan)}`;
-  }
-  // 年繳省多少:拿月繳年化來比,算得出來才顯示
-  const sub = $('#plan-annual-sub');
-  const a = plans && plans.annual, mo = plans && plans.monthly;
-  if (a && mo && typeof a.price === 'number' && typeof mo.price === 'number' && mo.price > 0) {
-    const pct = Math.round((1 - a.price / (mo.price * 12)) * 100);
-    sub.textContent = pct > 0 ? t('planSave', pct) : '';
-  } else {
-    sub.textContent = '';
-  }
-  picker.hidden = !available.length;
-  // 選中的方案若沒上架(例如沙盒只載到部分產品),要改選第一個可用的——
-  // 否則說明文字的續訂週期會跟畫面上的方案對不上(Apple 3.1.2)
-  selectPlan(available.includes(selectedPlan) ? selectedPlan : (available[0] || selectedPlan));
+  $('#plan-sixmonth-sub').textContent = perMonth ? t('planPerMonth', perMonth) : '';
+  picker.hidden = false;
 }
 
-let selectedPlan = 'annual';
-
-function selectPlan(plan) {
-  selectedPlan = plan;
-  $('#plan-picker').querySelectorAll('.plan-row').forEach((r) => {
-    r.classList.toggle('selected', r.dataset.plan === plan);
-  });
-  // 續訂週期說明要跟著改,否則選年繳卻寫「每月續訂」= 誤導(3.1.2)
-  if (IS_NATIVE && !isPro) {
-    const isAndroid = window.Capacitor?.getPlatform?.() === 'android';
-    $('#pro-hint').textContent = t(isAndroid ? 'proPitchIAPAndroid' : 'proPitchIAP', planUnit(plan));
-  }
-}
-
-$('#plan-picker').addEventListener('click', (e) => {
-  const row = e.target.closest('.plan-row');
-  if (row) selectPlan(row.dataset.plan);
-});
+const selectedPlan = 'sixmonth';
 
 async function onProClick() {
   if (isPro) return; // 已是 Pro

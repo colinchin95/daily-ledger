@@ -306,27 +306,14 @@
         </button>
       </div>
 
-      <!-- 方案選擇:年繳預設選中(最高轉換 + 最佳單位經濟) -->
+      <!-- 方案:只有一檔 6 個月 -->
       <div id="plan-picker" class="plan-picker" hidden>
-        <button class="plan-row" type="button" data-plan="annual">
+        <button class="plan-row selected" type="button" data-plan="sixmonth">
           <span class="plan-main">
-            <span class="plan-name" data-i18n="planAnnual">Yearly</span>
-            <span class="plan-sub" id="plan-annual-sub"></span>
+            <span class="plan-name" data-i18n="planSixMonth">6 months</span>
+            <span class="plan-sub" id="plan-sixmonth-sub"></span>
           </span>
-          <span class="plan-price" id="plan-annual-price">—</span>
-          <span class="plan-badge" data-i18n="planBest">Best value</span>
-        </button>
-        <button class="plan-row" type="button" data-plan="monthly">
-          <span class="plan-main">
-            <span class="plan-name" data-i18n="planMonthly">Monthly</span>
-          </span>
-          <span class="plan-price" id="plan-monthly-price">—</span>
-        </button>
-        <button class="plan-row" type="button" data-plan="weekly">
-          <span class="plan-main">
-            <span class="plan-name" data-i18n="planWeekly">Weekly</span>
-          </span>
-          <span class="plan-price" id="plan-weekly-price">—</span>
+          <span class="plan-price" id="plan-sixmonth-price">—</span>
         </button>
       </div>
       <p class="backup-hint pro-hint" id="pro-hint"></p>
