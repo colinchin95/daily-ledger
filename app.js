@@ -98,12 +98,22 @@ const STRINGS = {
     // Quick add (Back Tap)
     quickAddTitle: 'Quick add (Back Tap)',
     quickAddIntro: 'Jump straight to a new expense without hunting for the + button.',
-    quickAddIosSteps: [
-      '<b>Log what\u2019s on screen</b> (Touch \u2019n Go, bank app, e-receipt): open the <b>Shortcuts</b> app \u2192 tap <b>+</b> \u2192 add the action <b>Take Screenshot</b>, then add <b>Log Expense from Screenshot</b> (RichAuntie). Name it and tap <b>Done</b>.',
-      'Open <b>Settings \u2192 Accessibility \u2192 Touch \u2192 Back Tap \u2192 Double Tap</b>, scroll <b>all the way down</b> to the <b>Shortcuts</b> section and pick that shortcut (not \u201cAccessibility Shortcut\u201d).',
-      'On any payment screen, double-tap the back of your iPhone \u2014 AI reads the amount, merchant and date and fills in the entry. Turn on <b>Save automatically</b> below to skip the Save tap.',
-      'Just want an empty keypad? Use the <b>Quick Add Expense</b> action on its own instead.',
-    ],
+    backtapBanner: 'Log Touch \u2019n Go and bank payments by double-tapping the back of your iPhone.',
+    backtapSetup: 'Set up · 30s',
+    backtapIntro: 'Double-tap the back of your iPhone on any payment screen (Touch \u2019n Go, bank app, e-receipt) and RichAuntie logs it for you.',
+    backtapStep1: 'Add the RichAuntie shortcut',
+    backtapStep1Hint: 'Tap the button, then tap “Add Shortcut” in the Shortcuts app and come back here.',
+    backtapStep1Btn: 'Add shortcut',
+    backtapStep1Manual: 'In the Shortcuts app tap <b>+</b>, add <b>Take Screenshot</b>, then add <b>Log Expense from Screenshot</b> (RichAuntie). Name it <b>RichAuntie Log</b> and tap <b>Done</b>.',
+    backtapStep1ManualBtn: 'Open Shortcuts app',
+    backtapStep2: 'Turn on Back Tap',
+    backtapStep2Path: ['Settings', 'Accessibility', 'Touch', 'Back Tap', 'Double Tap'],
+    backtapStep2Hint: 'Scroll <b>all the way down</b> to the <b>Shortcuts</b> section and pick <b>RichAuntie Log</b>.',
+    backtapStep2Btn: 'Done — I\u2019ve set it',
+    backtapStep3: 'Try it',
+    backtapStep3Hint: 'Open a transaction in Touch \u2019n Go and double-tap the back of your phone.',
+    backtapDone: 'Set up',
+    backtapEmptyKeypad: 'Prefer an empty keypad instead? Use the <b>Quick Add Expense</b> action in Shortcuts.',
     quickAddIosSiri: 'Tip: you can also say “Hey Siri, log expense in RichAuntie”. Back Tap needs iPhone 8 or later.',
     quickAddAndroidSteps: [
       'Long-press the RichAuntie icon → <b>Log expense</b>. Drag it to your home screen for one-tap access.',
@@ -3547,6 +3557,11 @@ $('#import-btn').addEventListener('click', () => $('#import-file').click());
 // 備份提醒橫幅
 $('#backup-banner-now').addEventListener('click', exportBackup);
 $('#backup-banner-later').addEventListener('click', snoozeBackupBanner);
+$('#backtap-later').addEventListener('click', () => {
+  lsSet('backtapSnoozeUntil', String(Date.now() + 7 * DAY_MS));
+  maybeShowBacktapBanner();
+});
+$('#backtap-setup').addEventListener('click', openQuickAddSettings);
 
 // 資料保護提示橫幅
 $('#protect-enable').addEventListener('click', () => { hideProtectBanner(); openSyncSheet(); });
@@ -3724,11 +3739,133 @@ const raScan = async (b64) => {
   }
 };
 
+// 用戶在自己 iPhone 做好捷徑 → 分享 → 拷貝 iCloud 連結,貼在這裡就變成一鍵加入。
+// 空字串時退回手動教學 + 打開捷徑 App。
+const BACKTAP_SHORTCUT_URL = '';
+const BACKTAP_DONE_KEY = 'ra-backtap-done';
+const BACKTAP_STEP1_KEY = 'ra-backtap-step1';
+const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
+const isIOSNative = () => IS_NATIVE && window.Capacitor?.getPlatform?.() === 'ios';
+
+function openExternal(url) {
+  // Capacitor 會把非 App 內的網址 / scheme 交給系統開(iCloud 捷徑連結 → 捷徑 App)
+  window.open(url, '_blank');
+}
+
+function openQuickAddSettings() {
+  openCatModal();
+  showSettingsPage('quickadd', 'quickAddTitle');
+}
+
+// 明細頁頂部的一次性引導卡(只有 iOS App;設定完或按 Later 就不再出現)
+function maybeShowBacktapBanner() {
+  const el = $('#backtap-banner');
+  if (!el) return;
+  const snoozed = Date.now() < (Number(lsGet('backtapSnoozeUntil')) || 0);
+  el.hidden = !isIOSNative() || lsGet(BACKTAP_DONE_KEY) === '1' || snoozed;
+  if (!el.hidden) el.querySelector('.backtap-text').textContent = t('backtapBanner');
+}
+
+function renderBacktapSetup(page) {
+  const step1Done = lsGet(BACKTAP_STEP1_KEY) === '1';
+  const allDone = lsGet(BACKTAP_DONE_KEY) === '1';
+
+  const intro = document.createElement('p');
+  intro.className = 'qa-intro';
+  intro.textContent = t('backtapIntro');
+  page.appendChild(intro);
+
+  const step = (n, title, done) => {
+    const card = document.createElement('div');
+    card.className = 'bt-step' + (done ? ' done' : '');
+    card.innerHTML = `<div class="bt-step-head"><span class="bt-num"></span><span class="bt-title"></span></div><div class="bt-body"></div>`;
+    card.querySelector('.bt-num').textContent = done ? '✓' : n;
+    card.querySelector('.bt-title').textContent = title;
+    page.appendChild(card);
+    return card.querySelector('.bt-body');
+  };
+  const btn = (label, primary, onClick) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'bt-btn' + (primary ? ' primary' : '');
+    b.textContent = label;
+    b.addEventListener('click', onClick);
+    return b;
+  };
+  const hint = (html) => {
+    const p = document.createElement('p');
+    p.className = 'bt-hint';
+    p.innerHTML = html;   // 固定字串,只含 <b>
+    return p;
+  };
+
+  // 1. 加入捷徑
+  const b1 = step(1, t('backtapStep1'), step1Done);
+  if (BACKTAP_SHORTCUT_URL) {
+    b1.appendChild(hint(t('backtapStep1Hint')));
+    b1.appendChild(btn(t('backtapStep1Btn'), !step1Done, () => {
+      lsSet(BACKTAP_STEP1_KEY, '1');
+      openExternal(BACKTAP_SHORTCUT_URL);
+      setTimeout(() => showSettingsPage('quickadd', 'quickAddTitle'), 600);
+    }));
+  } else {
+    b1.appendChild(hint(t('backtapStep1Manual')));
+    b1.appendChild(btn(t('backtapStep1ManualBtn'), !step1Done, () => {
+      lsSet(BACKTAP_STEP1_KEY, '1');
+      openExternal('shortcuts://create-shortcut');
+      setTimeout(() => showSettingsPage('quickadd', 'quickAddTitle'), 600);
+    }));
+  }
+
+  // 2. 背面輕點(系統不允許 App 直接開這頁,只能給清楚的路徑)
+  const b2 = step(2, t('backtapStep2'), allDone);
+  const path = document.createElement('div');
+  path.className = 'bt-path';
+  t('backtapStep2Path').forEach((p, i) => {
+    if (i) { const s = document.createElement('span'); s.className = 'bt-sep'; s.textContent = '›'; path.appendChild(s); }
+    const c = document.createElement('span'); c.className = 'bt-crumb'; c.textContent = p; path.appendChild(c);
+  });
+  b2.appendChild(path);
+  b2.appendChild(hint(t('backtapStep2Hint')));
+  if (!allDone) {
+    b2.appendChild(btn(t('backtapStep2Btn'), step1Done, () => {
+      lsSet(BACKTAP_STEP1_KEY, '1');
+      lsSet(BACKTAP_DONE_KEY, '1');
+      maybeShowBacktapBanner();
+      showSettingsPage('quickadd', 'quickAddTitle');
+    }));
+  }
+
+  // 3. 試試看
+  const b3 = step(3, t('backtapStep3'), false);
+  b3.appendChild(hint(t('backtapStep3Hint')));
+}
+
 function renderQuickAddPage() {
   const page = $('#quickadd-body');
   const platform = window.Capacitor?.getPlatform?.() || 'web';
-  const steps = platform === 'ios' ? t('quickAddIosSteps')
-    : platform === 'android' ? t('quickAddAndroidSteps')
+  if (platform === 'ios') {
+    page.innerHTML = '';
+    renderBacktapSetup(page);
+    const list = document.createElement('div');
+    list.className = 'cat-list qa-actions';
+    const row = document.createElement('label');
+    row.className = 'cat-row qa-toggle-row';
+    row.innerHTML = `<span class="cat-row-name"></span><input type="checkbox" class="qa-switch">`;
+    row.querySelector('.cat-row-name').textContent = t('quickAddAutoSave');
+    const cb = row.querySelector('input');
+    cb.checked = autoSaveScans();
+    cb.addEventListener('change', () => lsSet(AUTO_SAVE_SCAN_KEY, cb.checked ? '1' : '0'));
+    list.appendChild(row);
+    page.appendChild(list);
+    const foot = document.createElement('p');
+    foot.className = 'backup-hint';
+    foot.innerHTML = `${t('quickAddAutoSaveHint')}<br><br>${t('quickAddIosSiri')} ${t('backtapEmptyKeypad')}`;
+    page.appendChild(foot);
+    return;
+  }
+  const steps = platform === 'android' ? t('quickAddAndroidSteps')
     : t('quickAddWebSteps');
   page.innerHTML = '';
   const intro = document.createElement('p');
@@ -3744,28 +3881,10 @@ function renderQuickAddPage() {
     ol.appendChild(li);
   }
   page.appendChild(ol);
-  if (platform === 'ios') {
-    const tip = document.createElement('p');
-    tip.className = 'backup-hint';
-    tip.textContent = t('quickAddIosSiri');
-    page.appendChild(tip);
-  }
 
   const list = document.createElement('div');
   list.className = 'cat-list qa-actions';
-  if (platform === 'ios') {
-    const row = document.createElement('label');
-    row.className = 'cat-row qa-toggle-row';
-    row.innerHTML = `<span class="cat-row-name"></span><input type="checkbox" class="qa-switch">`;
-    row.querySelector('.cat-row-name').textContent = t('quickAddAutoSave');
-    const cb = row.querySelector('input');
-    cb.checked = autoSaveScans();
-    cb.addEventListener('change', () => {
-      try { localStorage.setItem(AUTO_SAVE_SCAN_KEY, cb.checked ? '1' : '0'); } catch {}
-    });
-    list.appendChild(row);
-  }
-  if (platform !== 'ios') {
+  {
     const row = document.createElement('label');
     row.className = 'cat-row qa-toggle-row';
     row.innerHTML = `<span class="cat-row-name"></span><input type="checkbox" class="qa-switch">`;
@@ -3798,7 +3917,7 @@ function renderQuickAddPage() {
   page.appendChild(list);
   const hint = document.createElement('p');
   hint.className = 'backup-hint';
-  hint.textContent = platform === 'ios' ? t('quickAddAutoSaveHint') : t('quickAddLaunchHint');
+  hint.textContent = t('quickAddLaunchHint');
   page.appendChild(hint);
 }
 
@@ -3820,6 +3939,7 @@ async function init() {
   switchView('report');           // 預設開在「報表」頁
   maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
   maybeShowBackupBanner();        // 太久沒備份就提醒
+  maybeShowBacktapBanner();       // iOS:引導設定背面輕點記帳
   initQuickAdd();                 // 背面輕點 / 捷徑 / 長按圖示 → 直接記帳
 
   // PWA:註冊 service worker(需要 https 或 localhost)。

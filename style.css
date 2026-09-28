@@ -930,7 +930,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .backup-banner-btn:active { opacity: 0.7; }
 
 /* 資料保護提示(在 header 下、視圖之上,左右需自帶邊距) */
-.protect-banner { margin: 4px 16px 6px; }
+.protect-banner, .backtap-banner { margin: 4px 16px 6px; }
 
 /* ---------- 預算 ---------- */
 .budget-card { padding: 16px 18px; }
@@ -1642,3 +1642,36 @@ body.has-ad .modal {
 }
 .qa-switch:checked { background: var(--green); }
 .qa-switch:checked::after { transform: translateX(18px); }
+
+/* ---------- 背面輕點設定步驟 ---------- */
+.backtap-banner[hidden] { display: none; }
+.bt-step {
+  background: var(--surface); border-radius: 14px; padding: 14px 16px; margin: 12px 0 0;
+}
+.bt-step-head { display: flex; align-items: center; gap: 10px; }
+.bt-num {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; color: var(--on-gold);
+  background: linear-gradient(170deg, var(--gold-bright), var(--gold));
+}
+.bt-step.done .bt-num { background: var(--green); }
+.bt-title { font-size: 16px; font-weight: 600; color: var(--text); }
+.bt-step.done .bt-title { color: var(--text-2); }
+.bt-body { padding-left: 34px; }
+.bt-hint { font-size: 14px; color: var(--text-2); line-height: 1.5; margin: 8px 0 0; }
+.bt-hint b { color: var(--text); font-weight: 600; }
+.bt-path { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 10px; }
+.bt-crumb {
+  font-size: 13px; font-weight: 600; color: var(--text); background: var(--surface-2);
+  padding: 4px 9px; border-radius: 7px;
+}
+.bt-sep { color: var(--text-3); font-size: 14px; }
+.bt-btn {
+  margin-top: 12px; width: 100%; padding: 11px 14px; border-radius: 11px; border: none; cursor: pointer;
+  font: inherit; font-size: 15px; font-weight: 600; color: var(--gold); background: var(--surface-2);
+}
+.bt-btn.primary {
+  color: var(--on-gold);
+  background: linear-gradient(170deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%);
+}
+.bt-btn:active { opacity: 0.8; }
