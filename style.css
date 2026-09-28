@@ -17,6 +17,9 @@
   --on-gold: #FDFAF2;
   --serif: ui-serif, "New York", Georgia, "Songti TC", "Songti SC", serif;
   --spring: cubic-bezier(0.32, 0.72, 0.33, 1);
+  /* 趨勢圖兩條線(validate_palette.js 通過:淺色底 CVD ΔE 10.4、對比 ≥ 3:1) */
+  --chart-spent: #B07F0E;
+  --chart-income: #0F7B5E;
 }
 
 /* 深色:午夜絲絨——同一套語言的暗面(濃咖啡地 + 香檳字 + 金) */
@@ -37,6 +40,9 @@
     --red: #D97A6A;
     --blur-bar: rgba(23, 18, 12, 0.82);
     --on-gold: #1D1605;
+    /* 深色底另外驗證過的一組(CVD ΔE 10.0) */
+    --chart-spent: #B8891A;
+    --chart-income: #1A9A7A;
   }
 }
 
@@ -1074,16 +1080,10 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 /* 折線趨勢:支出(金)vs 收入(綠) */
 .trend-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .trend-head .trend-title { margin-bottom: 0; }
-.trend-range { display: flex; background: var(--surface-2); border-radius: 8px; padding: 2px; }
-.trend-range-btn {
-  border: none; background: none; font: inherit; font-size: 12px; color: var(--text-2);
-  padding: 3px 10px; border-radius: 6px; cursor: pointer;
-}
-.trend-range-btn.active { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,0.08); }
 .trend-legend { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; font-size: 12px; color: var(--text-2); margin-bottom: 6px; }
 .trend-legend .lg i { display: inline-block; width: 10px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 5px; }
-.trend-legend .lg-spent i { background: var(--gold-bright); }
-.trend-legend .lg-income i { background: var(--green); }
+.trend-legend .lg-spent i { background: var(--chart-spent); }
+.trend-legend .lg-income i { background: var(--chart-income); }
 .trend-legend b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
 .trend-legend .lg-income b { color: var(--green); }
 .trend-legend .lg-month { margin-left: auto; color: var(--text-3); }
@@ -1093,13 +1093,13 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .tr-cursor { stroke: var(--text-3); stroke-width: 1; stroke-dasharray: 3 3; }
 .tr-ylbl, .tr-xlbl { font-size: 10px; fill: var(--text-3); font-family: inherit; font-variant-numeric: tabular-nums; }
 .tr-xlbl.on { fill: var(--text); font-weight: 600; }
-.tr-line { fill: none; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
-.tr-line.tr-spent { stroke: var(--gold-bright); }
-.tr-line.tr-income { stroke: var(--green); }
-.tr-area { fill: var(--gold-bright); opacity: 0.12; }
-.tr-dot { stroke: var(--surface); stroke-width: 1.5; }
-.tr-dot.tr-spent { fill: var(--gold-bright); }
-.tr-dot.tr-income { fill: var(--green); }
+.tr-line { fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.tr-line.tr-spent { stroke: var(--chart-spent); }
+.tr-line.tr-income { stroke: var(--chart-income); }
+.tr-area { fill: var(--chart-spent); opacity: 0.10; }
+.tr-dot { stroke: var(--surface); stroke-width: 2; }
+.tr-dot.tr-spent { fill: var(--chart-spent); }
+.tr-dot.tr-income { fill: var(--chart-income); }
 .tr-hit { fill: transparent; cursor: pointer; }
 
 /* ---------- 備註篩選 ---------- */
@@ -1675,3 +1675,32 @@ body.has-ad .modal {
   background: linear-gradient(170deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%);
 }
 .bt-btn:active { opacity: 0.8; }
+
+/* ---------- 報表頁趨勢預覽卡 + Trends 頁 ---------- */
+.trend-preview { cursor: pointer; }
+.trend-preview:active { opacity: 0.85; }
+.trend-more { font-size: 13px; color: var(--gold); flex: none; }
+.trend-spark { margin-top: 2px; }
+.tr-endlbl { font-size: 10.5px; font-weight: 600; font-family: inherit; fill: var(--text-2); }
+#trends-body { padding-bottom: calc(env(safe-area-inset-bottom) + var(--ad-h, 0px) + 24px); }
+.trends-seg { margin-bottom: 14px; }
+.trends-chart-card { padding: 16px 16px 10px; }
+.trends-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 14px 0; }
+.trends-tile { background: var(--surface); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.tt-label { font-size: 12px; color: var(--text-2); }
+.tt-value { font-size: 18px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; }
+.trends-highlights { margin-bottom: 18px; }
+.trends-highlights .cat-row { cursor: default; }
+.trends-highlights .cat-row-count { margin-left: auto; }
+.tt-amt { font-weight: 600; font-variant-numeric: tabular-nums; min-width: 92px; text-align: right; }
+.trends-table { overflow: hidden; }
+.tt-row {
+  display: grid; grid-template-columns: 1.25fr 1fr 1fr 1fr; gap: 6px; align-items: center;
+  width: 100%; padding: 11px 14px; border: none; background: none; font: inherit; font-size: 14px;
+  color: var(--text); text-align: right; cursor: pointer; border-top: 0.5px solid var(--separator);
+}
+.tt-row > :first-child { text-align: left; }
+.tt-row .num { font-variant-numeric: tabular-nums; }
+.tt-row.on { background: var(--surface-2); }
+.tt-row:active { background: var(--surface-2); }
+.tt-headrow { font-size: 12px; color: var(--text-3); border-top: none; cursor: default; padding-top: 9px; padding-bottom: 7px; }

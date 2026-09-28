@@ -133,7 +133,19 @@ const STRINGS = {
     quickAddCopied: 'Copied: richauntie://add',
     trendSpent: 'Spent',
     trendIncomeLbl: 'Income',
-    trendRange: (n) => `${n}M`,
+    trendRange: (n) => (n === 'all' ? 'All' : `${n}M`),
+    trendsTitle: 'Trends',
+    trendsViewAll: 'View trends',
+    trendsAvgSpent: 'Avg spent / month',
+    trendsAvgIncome: 'Avg income / month',
+    trendsAvgSaved: 'Avg saved / month',
+    trendsSavingsRate: 'Savings rate',
+    trendsHighest: 'Highest spending',
+    trendsLowest: 'Lowest spending',
+    trendsByMonth: 'By month',
+    trendsColMonth: 'Month',
+    trendsColNet: 'Net',
+    trendsEmpty: 'Add a few entries to see your trends.',
     // Note filter
     frequentNotes: 'Frequent notes',
     searchSpent: (x) => `Spent ${x}`,
@@ -438,7 +450,6 @@ let accounts = [];      // 帳戶 { id, name, color, openingCents, renamed? }
 let searchQuery = '';   // 明細搜尋字串
 let noteExact = false;
 let searchFocused = false;  // 點了常用備註 chip → 只比對備註(完全相同),不混進分類/金額
-let trendRange = 6;     // 趨勢折線圖顯示幾個月
 
 let amountStr = '';
 let selectedCatId = null;
@@ -1143,13 +1154,18 @@ function compactRM(cents) {
   return String(Math.round(v));
 }
 
-function renderTrend() {
-  const n = trendRange;
+// 某段期間每個月的支出/收入。range:6、12 或 'all'(從第一筆帳目那個月開始,最多 36 個月)
+function trendMonths(range) {
   const cur = { y: now.getFullYear(), m: now.getMonth() + 1 };
+  const idx = (o) => o.y * 12 + (o.m - 1);
+  let n = range;
+  if (range === 'all') {
+    const first = entries.reduce((min, e) => (e.date < min ? e.date : min), todayStr());
+    const f = { y: Number(first.slice(0, 4)), m: Number(first.slice(5, 7)) };
+    n = Math.min(36, Math.max(2, idx(cur) - idx(f) + 1));
+  }
   // 報表月份若落在視窗外(翻到很久以前),視窗改以它為結尾
-  const idx = (o) => o.y * 12 + o.m;
   const endMonth = idx(reportMonth) <= idx(cur) - n ? reportMonth : cur;
-
   const months = [];
   for (let i = n - 1; i >= 0; i--) {
     let m = endMonth.m - i;
@@ -1164,47 +1180,18 @@ function renderTrend() {
     if (e.type === 'income') mo.income += e.amountCents;
     else mo.spent += e.amountCents;
   }
-  const selIdx = months.findIndex((mo) => mo.y === reportMonth.y && mo.m === reportMonth.m);
+  return months;
+}
 
-  trendCardEl.innerHTML = '';
-  const head = document.createElement('div');
-  head.className = 'trend-head';
-  const title = document.createElement('div');
-  title.className = 'trend-title';
-  title.textContent = t('trendBoth');
-  const seg = document.createElement('div');
-  seg.className = 'trend-range';
-  for (const r of [6, 12]) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'trend-range-btn' + (r === n ? ' active' : '');
-    b.textContent = t('trendRange', r);
-    b.addEventListener('click', () => { trendRange = r; renderTrend(); });
-    seg.appendChild(b);
-  }
-  head.append(title, seg);
-  trendCardEl.appendChild(head);
+const monthShort = (mo) => new Intl.DateTimeFormat('en-MY', { month: 'short' }).format(new Date(mo.y, mo.m - 1, 1));
+const monthLong = (mo) => new Intl.DateTimeFormat('en-MY', { month: 'short', year: 'numeric' }).format(new Date(mo.y, mo.m - 1, 1));
 
-  // 圖例 + 選中月份的數字(直接標數值,不必靠顏色猜)
-  const sel = months[selIdx] ?? months[months.length - 1];
-  const legend = document.createElement('div');
-  legend.className = 'trend-legend';
-  legend.innerHTML = `
-    <span class="lg lg-spent"><i></i><span class="lg-name"></span> <b class="num"></b></span>
-    <span class="lg lg-income"><i></i><span class="lg-name"></span> <b class="num"></b></span>
-    <span class="lg-month"></span>`;
-  legend.querySelector('.lg-spent .lg-name').textContent = t('trendSpent');
-  legend.querySelector('.lg-spent b').textContent = formatRM(sel.spent);
-  legend.querySelector('.lg-income .lg-name').textContent = t('trendIncomeLbl');
-  legend.querySelector('.lg-income b').textContent = formatRM(sel.income);
-  legend.querySelector('.lg-month').textContent = new Intl.DateTimeFormat('en-MY', { month: 'short', year: 'numeric' })
-    .format(new Date(sel.y, sel.m - 1, 1));
-  trendCardEl.appendChild(legend);
-
-  // 用卡片實際寬度畫,文字不會被縮放變形
-  const W = Math.max(260, (trendCardEl.clientWidth || 340) - 32);
-  const H = 150;
-  const pad = { l: 34, r: 8, t: 10, b: 22 };
+// 支出(金)對收入(綠)兩條線,同一個 y 軸。compact = 報表頁上的迷你預覽(無軸、無點擊)。
+function drawTrendChart(host, months, { height = 150, selIdx = -1, onSelect = null, compact = false } = {}) {
+  const n = months.length;
+  const W = Math.max(240, (host.clientWidth || 340));
+  const H = height;
+  const pad = compact ? { l: 4, r: 4, t: 6, b: 6 } : { l: 34, r: 46, t: 12, b: 22 };
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
   const maxV = niceMax(Math.max(...months.map((mo) => Math.max(mo.spent, mo.income)), 0));
@@ -1213,51 +1200,232 @@ function renderTrend() {
 
   const svg = svgEl('svg', { class: 'trend-svg', width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img' });
   svg.setAttribute('aria-label', months.map((mo) =>
-    `${mo.key}: ${t('trendSpent')} ${formatRM(mo.spent)}, ${t('trendIncomeLbl')} ${formatRM(mo.income)}`).join('; '));
+    `${monthLong(mo)}: ${t('trendSpent')} ${formatRM(mo.spent)}, ${t('trendIncomeLbl')} ${formatRM(mo.income)}`).join('; '));
 
-  // 格線:0 / 一半 / 頂端
-  for (const f of [0, 0.5, 1]) {
-    const gy = y(maxV * f);
-    svg.appendChild(svgEl('line', { x1: pad.l, x2: W - pad.r, y1: gy, y2: gy, class: f === 0 ? 'tr-axis' : 'tr-grid' }));
-    const lbl = svgEl('text', { x: pad.l - 6, y: gy + 3.5, class: 'tr-ylbl', 'text-anchor': 'end' });
-    lbl.textContent = compactRM(maxV * f);
-    svg.appendChild(lbl);
-  }
-
-  // 選中月份的直線標示
-  if (selIdx >= 0) {
-    svg.appendChild(svgEl('line', { x1: x(selIdx), x2: x(selIdx), y1: pad.t, y2: pad.t + ih, class: 'tr-cursor' }));
+  if (!compact) {
+    // 格線:0 / 一半 / 頂端
+    for (const f of [0, 0.5, 1]) {
+      const gy = y(maxV * f);
+      svg.appendChild(svgEl('line', { x1: pad.l, x2: W - pad.r, y1: gy, y2: gy, class: f === 0 ? 'tr-axis' : 'tr-grid' }));
+      const lbl = svgEl('text', { x: pad.l - 6, y: gy + 3.5, class: 'tr-ylbl', 'text-anchor': 'end' });
+      lbl.textContent = compactRM(maxV * f);
+      svg.appendChild(lbl);
+    }
+    if (selIdx >= 0) {
+      svg.appendChild(svgEl('line', { x1: x(selIdx), x2: x(selIdx), y1: pad.t, y2: pad.t + ih, class: 'tr-cursor' }));
+    }
   }
 
   const path = (key) => months.map((mo, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(mo[key]).toFixed(1)}`).join('');
-  // 支出底下淡淡的面積,讓主線更突出
-  svg.appendChild(svgEl('path', {
-    d: `${path('spent')}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z`, class: 'tr-area',
-  }));
+  svg.appendChild(svgEl('path', { d: `${path('spent')}L${x(n - 1).toFixed(1)},${y(0)}L${x(0).toFixed(1)},${y(0)}Z`, class: 'tr-area' }));
   svg.appendChild(svgEl('path', { d: path('income'), class: 'tr-line tr-income' }));
   svg.appendChild(svgEl('path', { d: path('spent'), class: 'tr-line tr-spent' }));
+  if (compact) return svg;
 
+  // 線尾直接標名稱:辨識不只靠顏色
+  const last = months[n - 1];
+  const ends = [
+    { key: 'spent', label: t('trendSpent'), yy: y(last.spent) },
+    { key: 'income', label: t('trendIncomeLbl'), yy: y(last.income) },
+  ].sort((a, b) => a.yy - b.yy);
+  if (ends[1].yy - ends[0].yy < 12) { ends[0].yy -= 6; ends[1].yy += 6; }   // 太近就上下錯開
+  for (const e of ends) {
+    const lbl = svgEl('text', { x: x(n - 1) + 8, y: e.yy + 3.5, class: `tr-endlbl tr-${e.key}-ink` });
+    lbl.textContent = e.label;
+    svg.appendChild(lbl);
+  }
+
+  // 月份標籤:月數多時只標一部分,選中的月份一定標
+  const step = n <= 6 ? 1 : n <= 12 ? 2 : Math.ceil(n / 6);
   months.forEach((mo, i) => {
     const on = i === selIdx;
-    svg.appendChild(svgEl('circle', { cx: x(i), cy: y(mo.income), r: on ? 4 : 2.5, class: 'tr-dot tr-income' }));
-    svg.appendChild(svgEl('circle', { cx: x(i), cy: y(mo.spent), r: on ? 4 : 2.5, class: 'tr-dot tr-spent' }));
-    // 12 個月時隔月標,避免擠在一起
-    if (n <= 6 || i % 2 === (n - 1) % 2 || on) {
+    svg.appendChild(svgEl('circle', { cx: x(i), cy: y(mo.income), r: on ? 4.5 : 3, class: 'tr-dot tr-income' }));
+    svg.appendChild(svgEl('circle', { cx: x(i), cy: y(mo.spent), r: on ? 4.5 : 3, class: 'tr-dot tr-spent' }));
+    if ((n - 1 - i) % step === 0 || on) {
       const lbl = svgEl('text', { x: x(i), y: H - 6, class: 'tr-xlbl' + (on ? ' on' : ''), 'text-anchor': 'middle' });
-      lbl.textContent = new Intl.DateTimeFormat('en-MY', { month: 'short' }).format(new Date(mo.y, mo.m - 1, 1));
+      lbl.textContent = monthShort(mo);
       svg.appendChild(lbl);
     }
-    // 整欄的透明點擊區:手指不用對準小圓點
-    const colW = n === 1 ? iw : iw / (n - 1);
-    const hit = svgEl('rect', { x: x(i) - colW / 2, y: 0, width: colW, height: H, class: 'tr-hit' });
-    hit.addEventListener('click', () => {
-      reportMonth = { y: mo.y, m: mo.m };
-      renderReport();
-    });
-    svg.appendChild(hit);
+    if (onSelect) {
+      // 整欄透明點擊區:手指不用對準小圓點
+      const colW = n === 1 ? iw : iw / (n - 1);
+      const hit = svgEl('rect', { x: x(i) - colW / 2, y: 0, width: colW, height: H, class: 'tr-hit' });
+      hit.addEventListener('click', () => onSelect(i));
+      hit.addEventListener('pointerenter', (ev) => { if (ev.pointerType === 'mouse') onSelect(i, true); });
+      svg.appendChild(hit);
+    }
   });
+  return svg;
+}
 
-  trendCardEl.appendChild(svg);
+// 圖例 + 選中月份的數字(直接標數值,不必靠顏色猜)
+function trendLegend(mo) {
+  const legend = document.createElement('div');
+  legend.className = 'trend-legend';
+  legend.innerHTML = `
+    <span class="lg lg-spent"><i></i><span class="lg-name"></span> <b class="num"></b></span>
+    <span class="lg lg-income"><i></i><span class="lg-name"></span> <b class="num"></b></span>
+    <span class="lg-month"></span>`;
+  legend.querySelector('.lg-spent .lg-name').textContent = t('trendSpent');
+  legend.querySelector('.lg-spent b').textContent = formatRM(mo.spent);
+  legend.querySelector('.lg-income .lg-name').textContent = t('trendIncomeLbl');
+  legend.querySelector('.lg-income b').textContent = formatRM(mo.income);
+  legend.querySelector('.lg-month').textContent = monthLong(mo);
+  return legend;
+}
+
+// ---------- 報表頁:趨勢預覽卡(點進去是完整的 Trends 頁) ----------
+function renderTrend() {
+  const months = trendMonths(6);
+  const cur = months[months.length - 1];
+  trendCardEl.innerHTML = '';
+  trendCardEl.classList.add('trend-preview');
+  const head = document.createElement('div');
+  head.className = 'trend-head';
+  head.innerHTML = `<span class="trend-title"></span><span class="trend-more"></span>`;
+  head.querySelector('.trend-title').textContent = t('trendBoth');
+  head.querySelector('.trend-more').textContent = `${t('trendsViewAll')} ›`;
+  trendCardEl.appendChild(head);
+  trendCardEl.appendChild(trendLegend(cur));
+  const box = document.createElement('div');
+  box.className = 'trend-spark';
+  trendCardEl.appendChild(box);
+  box.appendChild(drawTrendChart(box, months, { height: 64, compact: true }));
+}
+
+// ---------- Trends 頁 ----------
+let trendRange = 6;       // 6 / 12 / 'all'
+let trendSel = -1;        // 選中的月份索引(-1 = 最後一個月)
+
+function openTrends() {
+  trendSel = -1;
+  $('#trends-modal').classList.add('open');
+  renderTrendsPage();
+}
+function closeTrends() {
+  $('#trends-modal').classList.remove('open');
+}
+
+function renderTrendsPage() {
+  const body = $('#trends-body');
+  const months = trendMonths(trendRange);
+  const n = months.length;
+  const sel = trendSel >= 0 && trendSel < n ? trendSel : n - 1;
+  body.innerHTML = '';
+
+  // 期間切換
+  const seg = document.createElement('div');
+  seg.className = 'seg trends-seg';
+  for (const r of [6, 12, 'all']) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'seg-btn' + (r === trendRange ? ' active' : '');
+    b.textContent = t('trendRange', r);
+    b.addEventListener('click', () => { trendRange = r; trendSel = -1; renderTrendsPage(); });
+    seg.appendChild(b);
+  }
+  body.appendChild(seg);
+
+  const active = months.filter((mo) => mo.spent || mo.income);
+  if (!active.length) {
+    const empty = document.createElement('div');
+    empty.className = 'breakdown-empty';
+    empty.textContent = t('trendsEmpty');
+    body.appendChild(empty);
+    return;
+  }
+
+  // 大圖
+  const card = document.createElement('section');
+  card.className = 'card trend-card trends-chart-card';
+  card.appendChild(trendLegend(months[sel]));
+  const box = document.createElement('div');
+  card.appendChild(box);
+  body.appendChild(card);
+  box.appendChild(drawTrendChart(box, months, {
+    height: 230,
+    selIdx: sel,
+    onSelect: (i) => { if (i !== trendSel) { trendSel = i; renderTrendsPage(); } },
+  }));
+
+  // 摘要:只算有帳目的月份,不讓還沒開始用 App 的月份拉低平均
+  const avg = (key) => Math.round(active.reduce((s, mo) => s + mo[key], 0) / active.length);
+  const avgSpent = avg('spent');
+  const avgIncome = avg('income');
+  const avgSaved = avgIncome - avgSpent;
+  const totIncome = active.reduce((s, mo) => s + mo.income, 0);
+  const totSpent = active.reduce((s, mo) => s + mo.spent, 0);
+  const rate = totIncome > 0 ? Math.round(((totIncome - totSpent) / totIncome) * 100) : null;
+  const tiles = document.createElement('div');
+  tiles.className = 'trends-tiles';
+  const tile = (label, value, cls = '') => {
+    const d = document.createElement('div');
+    d.className = 'trends-tile';
+    d.innerHTML = `<span class="tt-label"></span><span class="tt-value num ${cls}"></span>`;
+    d.querySelector('.tt-label').textContent = label;
+    d.querySelector('.tt-value').textContent = value;
+    tiles.appendChild(d);
+  };
+  tile(t('trendsAvgSpent'), formatRM(avgSpent));
+  tile(t('trendsAvgIncome'), formatRM(avgIncome), 'income-text');
+  tile(t('trendsAvgSaved'), (avgSaved < 0 ? '−' : '') + formatRM(Math.abs(avgSaved)), avgSaved < 0 ? 'negative-text' : 'income-text');
+  tile(t('trendsSavingsRate'), rate === null ? '—' : `${rate}%`, rate !== null && rate < 0 ? 'negative-text' : '');
+  body.appendChild(tiles);
+
+  // 最高 / 最低支出月份
+  const spentMonths = active.filter((mo) => mo.spent > 0);
+  if (spentMonths.length >= 2) {
+    const hi = spentMonths.reduce((a, b) => (b.spent > a.spent ? b : a));
+    const lo = spentMonths.reduce((a, b) => (b.spent < a.spent ? b : a));
+    const hl = document.createElement('div');
+    hl.className = 'cat-list trends-highlights';
+    for (const [label, mo] of [[t('trendsHighest'), hi], [t('trendsLowest'), lo]]) {
+      const row = document.createElement('div');
+      row.className = 'cat-row';
+      row.innerHTML = `<span class="cat-row-name"></span><span class="cat-row-count"></span><span class="num tt-amt"></span>`;
+      row.querySelector('.cat-row-name').textContent = label;
+      row.querySelector('.cat-row-count').textContent = monthLong(mo);
+      row.querySelector('.tt-amt').textContent = formatRM(mo.spent);
+      hl.appendChild(row);
+    }
+    body.appendChild(hl);
+  }
+
+  // 逐月表格(也是圖表的文字版);點一列 → 回報表看那個月
+  const label = document.createElement('div');
+  label.className = 'section-label';
+  label.textContent = t('trendsByMonth');
+  body.appendChild(label);
+  const table = document.createElement('div');
+  table.className = 'cat-list trends-table';
+  const headRow = document.createElement('div');
+  headRow.className = 'tt-row tt-headrow';
+  for (const h of [t('trendsColMonth'), t('trendSpent'), t('trendIncomeLbl'), t('trendsColNet')]) {
+    const c = document.createElement('span');
+    c.textContent = h;
+    headRow.appendChild(c);
+  }
+  table.appendChild(headRow);
+  [...months].reverse().forEach((mo) => {
+    const net = mo.income - mo.spent;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'tt-row' + (mo === months[sel] ? ' on' : '');
+    row.innerHTML = `<span></span><span class="num"></span><span class="num income-text"></span><span class="num"></span>`;
+    const [c0, c1, c2, c3] = row.children;
+    c0.textContent = monthLong(mo);
+    c1.textContent = formatNum(mo.spent);
+    c2.textContent = formatNum(mo.income);
+    c3.textContent = (net < 0 ? '−' : '') + formatNum(Math.abs(net));
+    c3.classList.toggle('negative-text', net < 0);
+    row.addEventListener('click', () => {
+      reportMonth = { y: mo.y, m: mo.m };
+      closeTrends();
+      switchView('report');
+    });
+    table.appendChild(row);
+  });
+  body.appendChild(table);
 }
 
 // ---------- 本月常見備註(點了回明細,用備註篩選) ----------
@@ -3618,6 +3786,8 @@ lockScreenEl.querySelector('#lock-face-btn').addEventListener('click', async () 
 });
 
 $('#detail-back-btn').addEventListener('click', closeCatDetail);
+$('#trends-back-btn').addEventListener('click', closeTrends);
+trendCardEl.addEventListener('click', openTrends);
 
 $('#cat-editor-cancel').addEventListener('click', closeCatEditor);
 catEditorBackdropEl.addEventListener('click', closeCatEditor);
