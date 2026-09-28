@@ -5,6 +5,7 @@ import {
 } from './db.js';
 import { moneyRain, moneyBurn } from './entry-fx.js';
 import { parseCsv, reconcile, parseWithAI } from './reconcile.js';
+import { INSTITUTIONS, INSTITUTION_MAP } from './institutions.js';
 
 // 是否執行在原生 App(Capacitor / iOS 包裝版)殼層內。
 // iOS 上 Apple 規定數位內容只能用內購,不能用外部金流 → 隱藏 Pro 購買入口,
@@ -270,7 +271,7 @@ const STRINGS = {
     privacyPolicy: 'Privacy Policy',
     termsOfService: 'Terms of Service',
     accountsSection: 'Accounts',
-    accountsHint: 'Route income and expenses to different accounts; balance = opening balance + income − expenses.',
+    accountsHint: 'Add your bank accounts and e-wallets, then log income and spending to each. Balance = what you entered + income − expenses since then.',
     accountName: 'Account name',
     newAccount: 'New account',
     editAccount: 'Edit account',
@@ -280,6 +281,16 @@ const STRINGS = {
     openingBalance: 'Opening balance (optional)',
     netWorth: 'Net worth',
     accountsTitle: 'Account balances',
+    addAccount: 'Add account',
+    pickInstitution: 'Add account',
+    instSearch: 'Search bank or e-wallet',
+    instEwallets: 'E-wallets',
+    instBanks: 'Banks',
+    instOther: 'Cash, cards & others',
+    instCustom: 'Other account',
+    currentBalance: 'Current balance',
+    currentBalanceHint: 'Enter what the account shows right now. Credit card or loan? Use a minus sign, e.g. -1200.',
+    updateBalance: 'Tap an account to update its balance',
     avgPerDay: 'Avg / day',
     avgPerDayIncome: 'Avg / day',
     vsLastMonth: 'vs last month',
@@ -642,6 +653,36 @@ function acctName(a) {
   if (builtin && !a.renamed) return builtin;
   return a.name;
 }
+
+// 帳戶對應的銀行/錢包;舊資料沒有 inst,內建的 cash / tng 自動對上
+function acctInst(a) {
+  if (!a) return null;
+  return INSTITUTION_MAP.get(a.inst) || INSTITUTION_MAP.get(a.id === 'tng' || a.id === 'cash' ? a.id : '') || null;
+}
+
+// 帳戶徽章:品牌色 + 簡稱(有授權 logo 圖時改用圖);自訂帳戶用它自己的顏色 + 首字
+function acctBadge(a, size = 'md') {
+  const el = document.createElement('span');
+  el.className = `acct-badge acct-badge-${size}`;
+  const inst = acctInst(a);
+  if (inst?.logo) {
+    const img = document.createElement('img');
+    img.src = inst.logo;
+    img.alt = '';
+    el.appendChild(img);
+    return el;
+  }
+  el.style.background = inst ? inst.bg : (a?.color || '#8C95A3');
+  el.style.color = inst ? inst.fg : '#FFFFFF';
+  const txt = inst ? inst.short : (acctName(a).trim()[0] || '?').toUpperCase();
+  el.textContent = txt;
+  if (txt.length >= 4) el.classList.add('long');
+  return el;
+}
+
+// 帶正負號的金額(信用卡/貸款餘額是負的)
+const parseSignedMoney = (str) => (/^\s*[-−]/.test(String(str)) ? -1 : 1) * parseMoney(str);
+const signedToInput = (c) => (c < 0 ? '-' : '') + centsToInputStr(Math.abs(c));
 
 // 帳戶目前餘額 = 期初 + 全部收入 − 全部支出(沒 accountId 的舊帳目歸第一個帳戶)
 function acctBalance(a) {
@@ -1011,11 +1052,13 @@ function renderAccountsCard() {
   for (const a of accounts) {
     const bal = acctBalance(a);
     total += bal;
-    const row = document.createElement('div');
+    const row = document.createElement('button');
+    row.type = 'button';
     row.className = 'acct-bal-row';
-    row.innerHTML = `<span class="cat-dot"></span><span class="acct-bal-name"></span><span class="acct-bal-amt num"></span>`;
-    row.querySelector('.cat-dot').style.background = a.color;
+    row.innerHTML = `<span class="acct-bal-name"></span><span class="acct-bal-amt num"></span>`;
+    row.prepend(acctBadge(a, 'sm'));
     row.querySelector('.acct-bal-name').textContent = acctName(a);
+    row.addEventListener('click', () => openAcctEditor(a));
     const amt = row.querySelector('.acct-bal-amt');
     amt.textContent = formatRM(bal);
     if (bal < 0) amt.classList.add('negative-text');
@@ -1029,6 +1072,12 @@ function renderAccountsCard() {
   totalAmt.textContent = formatRM(total);
   totalAmt.classList.toggle('negative-text', total < 0);
   card.appendChild(totalRow);
+  const add = document.createElement('button');
+  add.type = 'button';
+  add.className = 'acct-add-btn';
+  add.textContent = `＋ ${t('addAccount')}`;
+  add.addEventListener('click', openInstPicker);
+  card.appendChild(add);
 }
 
 // ---------- 本月洞察(日均 / 較上月 / 最大單筆) ----------
@@ -1658,9 +1707,9 @@ function renderAccountChips() {
     const chip = document.createElement('button');
     chip.type = 'button';
     chip.className = 'acct-chip' + (a.id === selectedAcctId ? ' selected' : '');
-    chip.innerHTML = `<span class="cat-dot"></span><span></span>`;
-    chip.querySelector('.cat-dot').style.background = a.color;
-    chip.children[1].textContent = acctName(a);
+    chip.innerHTML = `<span></span>`;
+    chip.prepend(acctBadge(a, 'xs'));
+    chip.lastElementChild.textContent = acctName(a);
     chip.addEventListener('click', () => {
       selectedAcctId = a.id;
       renderAccountChips();
@@ -1840,11 +1889,10 @@ function renderAcctList() {
     row.type = 'button';
     row.className = 'cat-row';
     row.innerHTML = `
-      <span class="cat-dot"></span>
       <span class="cat-row-name"></span>
       <span class="cat-row-count num"></span>
       <span class="cat-row-chevron">›</span>`;
-    row.querySelector('.cat-dot').style.background = a.color;
+    row.prepend(acctBadge(a, 'sm'));
     row.querySelector('.cat-row-name').textContent = acctName(a);
     const bal = acctBalance(a);
     const balEl = row.querySelector('.cat-row-count');
@@ -1857,8 +1905,8 @@ function renderAcctList() {
   addRow.type = 'button';
   addRow.className = 'cat-row cat-row-add';
   addRow.innerHTML = `<span class="add-mark">＋</span><span class="cat-row-name"></span>`;
-  addRow.querySelector('.cat-row-name').textContent = t('newAccount');
-  addRow.addEventListener('click', () => openAcctEditor(null));
+  addRow.querySelector('.cat-row-name').textContent = t('addAccount');
+  addRow.addEventListener('click', openInstPicker);
   listEl2.appendChild(addRow);
 }
 
@@ -1878,12 +1926,28 @@ function renderAcctColorGrid() {
   }
 }
 
-function openAcctEditor(acct) {
+let editingInst = null;   // 新增時從挑選器帶進來的銀行/錢包 id
+
+function openAcctEditor(acct, instId = null) {
   editingAcctId = acct?.id ?? null;
+  const inst = acct ? acctInst(acct) : INSTITUTION_MAP.get(instId) || null;
+  editingInst = inst?.id ?? null;
   $('#acct-editor-title').textContent = acct ? t('editAccount') : t('newAccount');
-  $('#acct-name-input').value = acct ? acctName(acct) : '';
-  $('#acct-opening-input').value = acct?.openingCents ? centsToInputStr(acct.openingCents) : '';
-  acctEditorColor = acct?.color ?? PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  $('#acct-name-input').value = acct ? acctName(acct) : (inst ? inst.name : '');
+  // 顯示「目前餘額」,存檔時反推期初:期初 = 目前餘額 − 期間收支
+  $('#acct-opening-input').value = acct ? signedToInput(acctBalance(acct)) : '';
+  acctEditorColor = acct?.color ?? inst?.bg ?? PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  // 選了銀行/錢包就用品牌色,不必再挑顏色
+  const head = $('#acct-editor-inst');
+  head.innerHTML = '';
+  if (inst) {
+    head.appendChild(acctBadge({ inst: inst.id }, 'lg'));
+    const nm = document.createElement('span');
+    nm.textContent = inst.name;
+    head.appendChild(nm);
+  }
+  head.hidden = !inst;
+  $('#acct-color-grid').hidden = !!inst;
   renderAcctColorGrid();
   $('#acct-delete-btn').hidden = !acct || accounts.length <= 1;
   $('#acct-editor').classList.add('open');
@@ -1896,25 +1960,82 @@ function closeAcctEditor() {
 }
 
 async function onAcctSave() {
-  const name = $('#acct-name-input').value.trim().slice(0, 12);
-  if (!name) return;
-  const opening = toCents($('#acct-opening-input').value.trim());
+  const name = $('#acct-name-input').value.trim().slice(0, 24);
+  if (!name) { $('#acct-name-input').focus(); return; }
+  const target = parseSignedMoney($('#acct-opening-input').value.trim());
+  const inst = INSTITUTION_MAP.get(editingInst);
   if (editingAcctId) {
     const a = accounts.find((x) => x.id === editingAcctId);
     if (a) {
       if (name !== acctName(a)) { a.name = name; a.renamed = true; }
-      a.color = acctEditorColor;
-      a.openingCents = opening > 0 ? opening : 0;
+      if (!inst) a.color = acctEditorColor;
+      const flows = acctBalance(a) - (a.openingCents || 0);
+      a.openingCents = target - flows;
     }
   } else {
-    accounts.push({ id: crypto.randomUUID(), name, color: acctEditorColor, openingCents: opening > 0 ? opening : 0 });
+    const a = { id: crypto.randomUUID(), name, color: inst ? inst.bg : acctEditorColor, openingCents: target };
+    if (inst) a.inst = inst.id;
+    accounts.push(a);
   }
   await saveAccounts(accounts);
   schedulePush();
   closeAcctEditor();
   renderAcctList();
+  renderAccountChips();
   renderList();
   if (!viewReportEl.hidden) renderReport();
+}
+
+// ---------- 新增帳戶:挑銀行 / 電子錢包 ----------
+function openInstPicker() {
+  $('#inst-search').value = '';
+  renderInstPicker();
+  $('#inst-picker').classList.add('open');
+  $('#inst-picker-backdrop').classList.add('open');
+}
+
+function closeInstPicker() {
+  $('#inst-picker').classList.remove('open');
+  $('#inst-picker-backdrop').classList.remove('open');
+}
+
+function renderInstPicker() {
+  const q = $('#inst-search').value.trim().toLowerCase();
+  const body = $('#inst-list');
+  body.innerHTML = '';
+  const match = (x) => !q || x.name.toLowerCase().includes(q) || x.short.toLowerCase().includes(q) || x.id.includes(q);
+  const groups = [['ewallet', t('instEwallets')], ['bank', t('instBanks')], ['other', t('instOther')]];
+  for (const [kind, title] of groups) {
+    const items = INSTITUTIONS.filter((x) => x.kind === kind && match(x));
+    if (!items.length) continue;
+    const h = document.createElement('div');
+    h.className = 'section-label';
+    h.textContent = title;
+    body.appendChild(h);
+    const grid = document.createElement('div');
+    grid.className = 'inst-grid';
+    for (const x of items) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'inst-tile';
+      b.appendChild(acctBadge({ inst: x.id }, 'lg'));
+      const nm = document.createElement('span');
+      nm.className = 'inst-name';
+      nm.textContent = x.name;
+      b.appendChild(nm);
+      b.addEventListener('click', () => { closeInstPicker(); openAcctEditor(null, x.id); });
+      grid.appendChild(b);
+    }
+    body.appendChild(grid);
+  }
+  // 清單裡沒有的:自訂名稱與顏色
+  const custom = document.createElement('button');
+  custom.type = 'button';
+  custom.className = 'cat-row cat-row-add inst-custom';
+  custom.innerHTML = `<span class="add-mark">＋</span><span class="cat-row-name"></span>`;
+  custom.querySelector('.cat-row-name').textContent = t('instCustom');
+  custom.addEventListener('click', () => { closeInstPicker(); openAcctEditor(null); });
+  body.appendChild(custom);
 }
 
 async function onAcctDelete() {
@@ -2820,12 +2941,14 @@ function sanitizeAccount(a) {
   if (!a || typeof a !== 'object' || typeof a.name !== 'string' || !a.name.trim()) return null;
   const out = {
     id: typeof a.id === 'string' && a.id ? a.id : crypto.randomUUID(),
-    name: a.name.trim().slice(0, 12),
+    name: a.name.trim().slice(0, 24),
     color: /^#[0-9a-fA-F]{6}$/.test(a.color) ? a.color : '#8C95A3',
     openingCents: 0,
   };
+  // 信用卡 / 貸款的餘額可以是負的
   const op = Math.round(Number(a.openingCents));
-  if (Number.isFinite(op) && op > 0) out.openingCents = op;
+  if (Number.isFinite(op)) out.openingCents = op;
+  if (typeof a.inst === 'string' && INSTITUTION_MAP.has(a.inst)) out.inst = a.inst;
   if (a.renamed === true) out.renamed = true;
   return out;
 }
@@ -3739,6 +3862,16 @@ $('#acct-editor-cancel').addEventListener('click', closeAcctEditor);
 $('#acct-editor-backdrop').addEventListener('click', closeAcctEditor);
 $('#acct-editor-save').addEventListener('click', onAcctSave);
 $('#acct-delete-btn').addEventListener('click', onAcctDelete);
+$('#inst-search').addEventListener('input', renderInstPicker);
+// iOS 數字鍵盤沒有負號:用 ± 切換(信用卡 / 貸款)
+$('#acct-sign-btn').addEventListener('click', () => {
+  const el = $('#acct-opening-input');
+  const v = el.value.trim();
+  el.value = /^[-−]/.test(v) ? v.replace(/^[-−]\s*/, '') : '-' + (v || '');
+  el.focus();
+});
+$('#inst-picker-cancel').addEventListener('click', closeInstPicker);
+$('#inst-picker-backdrop').addEventListener('click', closeInstPicker);
 
 // 固定支出編輯器
 $('#recur-cancel').addEventListener('click', closeRecurEditor);

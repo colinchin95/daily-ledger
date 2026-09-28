@@ -1478,6 +1478,8 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   padding: 9px 2px;
   border-bottom: 1px solid var(--separator);
 }
+button.acct-bal-row { width: 100%; background: none; border-left: none; border-right: none; border-top: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+button.acct-bal-row:active { background: var(--surface-2); }
 .acct-bal-row:last-child { border-bottom: none; }
 .acct-bal-name { flex: 1; font-size: 14px; color: var(--text-2); }
 .acct-bal-amt { font-size: 15px; font-weight: 600; }
@@ -1704,3 +1706,47 @@ body.has-ad .modal {
 .tt-row.on { background: var(--surface-2); }
 .tt-row:active { background: var(--surface-2); }
 .tt-headrow { font-size: 12px; color: var(--text-3); border-top: none; cursor: default; padding-top: 9px; padding-bottom: 7px; }
+
+/* ---------- 帳戶徽章(銀行 / 電子錢包) ---------- */
+.acct-badge {
+  flex: none; display: inline-grid; place-items: center; overflow: hidden;
+  border-radius: 7px; font-weight: 800; letter-spacing: -0.2px; line-height: 1;
+  font-family: -apple-system, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
+}
+.acct-badge img { width: 100%; height: 100%; object-fit: cover; }
+.acct-badge-xs { width: 18px; height: 18px; border-radius: 5px; font-size: 7px; }
+.acct-badge-sm { width: 28px; height: 28px; font-size: 10px; }
+.acct-badge-sm.long { font-size: 8.5px; }
+.acct-badge-lg { width: 44px; height: 44px; border-radius: 11px; font-size: 14px; }
+.acct-badge-lg.long { font-size: 12px; }
+.acct-badge-xs.long { font-size: 5.5px; }
+.acct-chip { gap: 6px; }
+
+.acct-add-btn {
+  display: block; width: 100%; margin-top: 8px; padding: 10px 0 2px; border: none; background: none;
+  font: inherit; font-size: 14px; font-weight: 600; color: var(--gold); text-align: left; cursor: pointer;
+}
+
+/* 挑銀行 / 錢包 */
+.inst-picker { max-height: 88dvh; display: flex; flex-direction: column; }
+.inst-picker #inst-search { margin-bottom: 6px; }
+.inst-list { overflow-y: auto; padding-bottom: calc(env(safe-area-inset-bottom) + 16px); margin: 0 -4px; padding-left: 4px; padding-right: 4px; }
+.inst-list .section-label { padding-left: 2px; margin-top: 14px; }
+.inst-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px 6px; }
+.inst-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  border: none; background: none; font: inherit; color: var(--text); cursor: pointer; padding: 4px 0;
+}
+.inst-tile:active { opacity: 0.6; }
+.inst-name { font-size: 11px; line-height: 1.2; text-align: center; color: var(--text-2); max-width: 78px; }
+.inst-custom { margin-top: 18px; background: var(--surface-2); border-radius: 12px; }
+
+/* 帳戶編輯器 */
+.acct-editor-inst { display: flex; align-items: center; gap: 12px; font-size: 16px; font-weight: 600; margin: 4px 0 14px; }
+.acct-editor-inst[hidden] { display: none; }
+.acct-bal-label { padding: 0 2px 6px; }
+.acct-sign-btn {
+  flex: none; width: 34px; height: 30px; border-radius: 8px; border: none; cursor: pointer;
+  background: var(--surface-3); color: var(--text); font: inherit; font-size: 16px; font-weight: 700;
+}
+.acct-bal-hint { padding: 0 2px 12px; margin-top: -8px; }

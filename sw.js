@@ -1,6 +1,6 @@
 // Service Worker:App 殼層快取,離線也能開
 // 改版時把 VERSION +1,舊快取會在 activate 時清掉
-const VERSION = 'daily-ledger-v40';
+const VERSION = 'daily-ledger-v41';
 
 const SHELL = [
   './',
@@ -10,6 +10,7 @@ const SHELL = [
   './db.js',
   './entry-fx.js',
   './reconcile.js',
+  './institutions.js',
   './lib/idb-keyval.js',
   './manifest.json',
   './privacy.html',

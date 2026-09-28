@@ -451,13 +451,30 @@
       <span id="acct-editor-title" class="sheet-title">Edit account</span>
       <button id="acct-editor-save" class="sheet-header-btn strong" type="button" data-i18n="save">Save</button>
     </div>
-    <input id="acct-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="accountName" placeholder="Account name" maxlength="12">
+    <div id="acct-editor-inst" class="acct-editor-inst" hidden></div>
+    <input id="acct-name-input" class="field-input cat-name-input" type="text" data-i18n-ph="accountName" placeholder="Account name" maxlength="24">
     <div id="acct-color-grid" class="color-grid"></div>
+    <div class="section-label acct-bal-label" data-i18n="currentBalance">Current balance</div>
     <label class="budget-field">
       <span class="budget-field-prefix">RM</span>
-      <input id="acct-opening-input" class="field-input" type="text" inputmode="decimal" data-i18n-ph="openingBalance" placeholder="Opening balance (optional)">
+      <input id="acct-opening-input" class="field-input" type="text" inputmode="decimal" placeholder="0.00">
+      <button id="acct-sign-btn" class="acct-sign-btn" type="button" aria-label="plus or minus">±</button>
     </label>
+    <p class="backup-hint acct-bal-hint" data-i18n="currentBalanceHint">Enter what the account shows right now. Credit card or loan? Use a minus sign, e.g. -1200.</p>
     <button id="acct-delete-btn" class="cat-delete-btn" type="button" data-i18n="deleteAccount" hidden>Delete account</button>
+  </section>
+
+  <!-- 新增帳戶:挑銀行 / 電子錢包 -->
+  <div id="inst-picker-backdrop" class="backdrop editor-backdrop"></div>
+  <section id="inst-picker" class="sheet cat-editor inst-picker">
+    <div class="grabber"></div>
+    <div class="sheet-header">
+      <button id="inst-picker-cancel" class="sheet-header-btn" type="button" data-i18n="cancel">Cancel</button>
+      <span class="sheet-title" data-i18n="pickInstitution">Add account</span>
+      <span class="sheet-header-btn" aria-hidden="true"></span>
+    </div>
+    <input id="inst-search" class="field-input" type="search" autocomplete="off" data-i18n-ph="instSearch" placeholder="Search bank or e-wallet">
+    <div id="inst-list" class="inst-list"></div>
   </section>
 
   <!-- 固定支出編輯器 -->
