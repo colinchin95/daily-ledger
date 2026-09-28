@@ -3741,7 +3741,7 @@ const raScan = async (b64) => {
 
 // 用戶在自己 iPhone 做好捷徑 → 分享 → 拷貝 iCloud 連結,貼在這裡就變成一鍵加入。
 // 空字串時退回手動教學 + 打開捷徑 App。
-const BACKTAP_SHORTCUT_URL = '';
+const BACKTAP_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/021e402d801642c8b9e0896888665f75';
 const BACKTAP_DONE_KEY = 'ra-backtap-done';
 const BACKTAP_STEP1_KEY = 'ra-backtap-step1';
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
