@@ -99,10 +99,10 @@ const STRINGS = {
     quickAddTitle: 'Quick add (Back Tap)',
     quickAddIntro: 'Jump straight to a new expense without hunting for the + button.',
     quickAddIosSteps: [
-      'Open the <b>Shortcuts</b> app → tap <b>+</b> → <b>Add Action</b>.',
-      'Search <b>RichAuntie</b> and pick <b>Quick Add Expense</b>. Tap <b>Done</b>.',
-      'Open <b>Settings → Accessibility → Touch → Back Tap → Double Tap</b> and choose that shortcut.',
-      'Double-tap the back of your iPhone — RichAuntie opens on a new expense.',
+      '<b>Log what\u2019s on screen</b> (Touch \u2019n Go, bank app, e-receipt): open the <b>Shortcuts</b> app \u2192 tap <b>+</b> \u2192 add the action <b>Take Screenshot</b>, then add <b>Log Expense from Screenshot</b> (RichAuntie). Name it and tap <b>Done</b>.',
+      'Open <b>Settings \u2192 Accessibility \u2192 Touch \u2192 Back Tap \u2192 Double Tap</b>, scroll <b>all the way down</b> to the <b>Shortcuts</b> section and pick that shortcut (not \u201cAccessibility Shortcut\u201d).',
+      'On any payment screen, double-tap the back of your iPhone \u2014 AI reads the amount, merchant and date and fills in the entry. Turn on <b>Save automatically</b> below to skip the Save tap.',
+      'Just want an empty keypad? Use the <b>Quick Add Expense</b> action on its own instead.',
     ],
     quickAddIosSiri: 'Tip: you can also say “Hey Siri, log expense in RichAuntie”. Back Tap needs iPhone 8 or later.',
     quickAddAndroidSteps: [
@@ -115,6 +115,8 @@ const STRINGS = {
       'On Android, long-press the icon → <b>Log expense</b>.',
     ],
     quickAddLaunchToggle: 'Open straight to a new entry',
+    quickAddAutoSave: 'Save screenshot entries automatically',
+    quickAddAutoSaveHint: 'Uses one AI receipt scan per screenshot. When off, the entry is filled in and waits for you to tap Save.',
     quickAddLaunchHint: 'When RichAuntie is opened (or reopened after 30 seconds away), start on the new-expense keypad.',
     quickAddTry: 'Try it now',
     quickAddCopyLink: 'Copy quick-add link',
@@ -2908,6 +2910,14 @@ function ensureAiConsent(kind) {
 async function onReceiptFile(file) {
   if (!file) return;
   if (!ensureAiConsent('receipt')) return;
+  let image;
+  try { image = await fileToBase64(file); } catch { alert(t('receiptFailed')); return; }
+  await scanReceiptImage(image);
+}
+
+// 收據 / 付款截圖 → AI 讀出金額、商家、日期、分類,填進記帳面板。成功填入回傳 true。
+// 呼叫前要先 openSheet(),而且已取得 AI 同意。
+async function scanReceiptImage(image) {
   const btn = $('#receipt-btn');
   const label = btn.querySelector('.receipt-label');
   const original = label.textContent;
@@ -2915,7 +2925,6 @@ async function onReceiptFile(file) {
   btn.classList.add('busy');
   label.textContent = t('scanningReceipt');
   try {
-    const image = await fileToBase64(file);
     const names = aiCategoryLabels('expense');
     const res = await fetch(RECEIPT_ENDPOINT, {
       method: 'POST',
@@ -2934,23 +2943,29 @@ async function onReceiptFile(file) {
       else if (res.status === 429) alert(t('receiptRate'));
       else if (res.status === 503) alert(t('receiptBusy'));
       else alert(t('receiptFailed'));
-      return;
+      return false;
     }
     const r = await res.json();
 
-    setSheetType('expense'); // 收據一律當支出
+    // 收據一律是支出;付款 App 截圖(TNG 收款、轉入)可能是收入
+    const isIn = r.direction === 'in';
+    setSheetType(isIn ? 'income' : 'expense');
     if (typeof r.amount === 'number' && r.amount > 0) {
       amountStr = String(Math.round(r.amount * 100) / 100);
       renderAmount();
     }
     if (r.merchant) noteInput.value = String(r.merchant).slice(0, 60);
     if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) dateInput.value = r.date;
-    const match = findCatByAiName(r.category, 'expense');
-    if (match) selectedCatId = match.id;
+    if (!isIn) {
+      const match = findCatByAiName(r.category, 'expense');
+      if (match) selectedCatId = match.id;
+    }
     renderCategoryChips();
     updateSaveState();
+    return typeof r.amount === 'number' && r.amount > 0;
   } catch {
     alert(t('receiptFailed'));
+    return false;
   } finally {
     btn.disabled = false;
     btn.classList.remove('busy');
@@ -3658,6 +3673,8 @@ function handleQuickAddUrl(raw) {
 }
 
 function initQuickAdd() {
+  // 資料載入完才開放給原生呼叫;原生端會一直等到這個函式出現
+  window.__raScan = raScan;
   // PWA 捷徑:./?action=add
   if (handleQuickAddUrl(location.href)) {
     history.replaceState(null, '', location.pathname);
@@ -3681,6 +3698,31 @@ function initQuickAdd() {
     if (launchToAdd() && hiddenAt && Date.now() - hiddenAt > 30000 && !sheetEl.classList.contains('open')) quickAdd();
   });
 }
+
+// 背面輕點 → 捷徑「截圖」→「Log Expense from Screenshot」:原生把 JPEG base64 丟進來
+const AUTO_SAVE_SCAN_KEY = 'ra-scan-autosave';
+const autoSaveScans = () => { try { return localStorage.getItem(AUTO_SAVE_SCAN_KEY) === '1'; } catch { return false; } };
+let scanBusy = false;
+
+const raScan = async (b64) => {
+  if (scanBusy || typeof b64 !== 'string' || !b64) return;
+  scanBusy = true;
+  try {
+    quickAdd();
+    if (!ensureAiConsent('receipt')) return;
+    const ok = await scanReceiptImage(b64);
+    if (!ok || !autoSaveScans()) return;
+    // 自動存檔:AI 沒給分類就放「Other」,金額一定要有
+    if (!selectedCatId) {
+      const fallback = categories.find((c) => c.id === (sheetType === 'income' ? 'other-income' : 'other'))
+        || catsOfType(sheetType)[0];
+      if (fallback) selectedCatId = fallback.id;
+    }
+    if (toCents(amountStr) > 0 && selectedCatId) await onSave();
+  } finally {
+    scanBusy = false;
+  }
+};
 
 function renderQuickAddPage() {
   const page = $('#quickadd-body');
@@ -3711,6 +3753,18 @@ function renderQuickAddPage() {
 
   const list = document.createElement('div');
   list.className = 'cat-list qa-actions';
+  if (platform === 'ios') {
+    const row = document.createElement('label');
+    row.className = 'cat-row qa-toggle-row';
+    row.innerHTML = `<span class="cat-row-name"></span><input type="checkbox" class="qa-switch">`;
+    row.querySelector('.cat-row-name').textContent = t('quickAddAutoSave');
+    const cb = row.querySelector('input');
+    cb.checked = autoSaveScans();
+    cb.addEventListener('change', () => {
+      try { localStorage.setItem(AUTO_SAVE_SCAN_KEY, cb.checked ? '1' : '0'); } catch {}
+    });
+    list.appendChild(row);
+  }
   if (platform !== 'ios') {
     const row = document.createElement('label');
     row.className = 'cat-row qa-toggle-row';
@@ -3742,12 +3796,10 @@ function renderQuickAddPage() {
     list.appendChild(copy);
   }
   page.appendChild(list);
-  if (platform !== 'ios') {
-    const hint = document.createElement('p');
-    hint.className = 'backup-hint';
-    hint.textContent = t('quickAddLaunchHint');
-    page.appendChild(hint);
-  }
+  const hint = document.createElement('p');
+  hint.className = 'backup-hint';
+  hint.textContent = platform === 'ios' ? t('quickAddAutoSaveHint') : t('quickAddLaunchHint');
+  page.appendChild(hint);
 }
 
 // ---------- 啟動 ----------
