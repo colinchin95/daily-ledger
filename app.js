@@ -309,6 +309,11 @@ const STRINGS = {
     topSpend: 'Biggest expense',
     dailyTitle: 'Daily spending',
     dailyTitleIncome: 'Daily income',
+    dailyTitleExFixed: 'Daily spending (excl. fixed)',
+    splitLine: (d, f) => `Daily ${d} + Fixed ${f}`,
+    excludeFixed: 'Exclude fixed',
+    fixedExpense: 'Fixed expense',
+    fixedShort: 'Fixed',
     // Sub-categories
     subGeneral: 'General',
     newSubcategory: 'New subcategory',
@@ -747,6 +752,10 @@ function setCurrency(code) {
   if (detailCatId !== null) renderCatDetail();
 }
 
+// ---------- 固定 / 日常支出 ----------
+// fixed === true → 固定;fixed === false → 使用者明確取消;沒有這個欄位 → 由 Recurring 規則產生的就算固定
+const isFixed = (e) => e.type !== 'income' && (e.fixed === true || (e.fixed !== false && !!e.recurringId));
+
 // ---------- 明細列表 ----------
 const normNote = (s) => String(s || '').trim().replace(/\s+/g, ' ').toLowerCase();
 
@@ -951,6 +960,12 @@ function renderReport() {
   reportBalanceEl.textContent = (net < 0 ? '−' : '') + formatRM(Math.abs(net));
   reportBalanceEl.classList.toggle('negative-text', net < 0);
 
+  // 主數字照舊含全部支出;有固定支出才顯示拆分
+  const fixed = monthEntries.filter(isFixed).reduce((s, e) => s + e.amountCents, 0);
+  const splitEl = $('#report-split');
+  splitEl.hidden = fixed <= 0;
+  if (fixed > 0) splitEl.textContent = t('splitLine', formatRM(expense - fixed), formatRM(fixed));
+
   renderDeltaTag(key, expense);
   renderBudgetLine(expense);
   renderDaily(key, monthEntries);
@@ -959,7 +974,11 @@ function renderReport() {
   // 各分類佔比
   const cats = catMap();
   const isIncome = reportType === 'income';
-  const typed = monthEntries.filter((e) => (e.type === 'income') === isIncome);
+  // 「Exclude fixed」:只在看支出、且本月有固定支出時提供
+  const hasFixed = !isIncome && monthEntries.some(isFixed);
+  renderFixedToggle(hasFixed);
+  const typed = monthEntries.filter((e) => (e.type === 'income') === isIncome
+    && !(hasFixed && reportExcludeFixed && isFixed(e)));
   const total = typed.reduce((s, e) => s + e.amountCents, 0);
 
   const byCat = new Map();
@@ -1088,6 +1107,19 @@ function renderBudgetLine(expense) {
   if (ratio > 0.9) left.style.color = color;
 }
 
+// ---------- 分類區塊:排除固定支出 ----------
+let reportExcludeFixed = false;
+function renderFixedToggle(show) {
+  const row = $('#report-fixed-toggle');
+  row.hidden = !show;
+  if (!show) return;
+  row.innerHTML = `<label class="fixed-toggle"><span></span><input type="checkbox" class="qa-switch qa-switch-sm"></label>`;
+  row.querySelector('span').textContent = t('excludeFixed');
+  const cb = row.querySelector('input');
+  cb.checked = reportExcludeFixed;
+  cb.addEventListener('change', () => { reportExcludeFixed = cb.checked; renderReport(); });
+}
+
 // ---------- 入口列:淨資產 / 趨勢 ----------
 function renderReportLinks() {
   // 淨資產 = 所有帳戶目前餘額,不受月份切換影響
@@ -1101,7 +1133,8 @@ function renderReportLinks() {
 function renderDaily(key, monthEntries) {
   const card = $('#daily-card');
   card.innerHTML = '';
-  const typed = monthEntries.filter((e) => e.type !== 'income');
+  // 只算日常(變動)支出:房租這類固定支出會把第 1 天壓成一根柱子
+  const typed = monthEntries.filter((e) => e.type !== 'income' && !isFixed(e));
   if (!typed.length) { card.hidden = true; return; }
   card.hidden = false;
 
@@ -1117,7 +1150,7 @@ function renderDaily(key, monthEntries) {
 
   const title = document.createElement('div');
   title.className = 'trend-title';
-  title.textContent = t('dailyTitle');
+  title.textContent = t('dailyTitleExFixed');
   card.appendChild(title);
 
   const chart = document.createElement('div');
@@ -1641,6 +1674,7 @@ function updateSaveState() {
 function setSheetType(type) {
   sheetType = type;
   sheetEl.dataset.type = type;
+  $('#fixed-chip').hidden = type === 'income';
   setSegActive(typeSegEl, type);
   if (selectedCatId && catMap().get(selectedCatId)?.type !== type) selectedCatId = null;
   renderCategoryChips();
@@ -1656,11 +1690,20 @@ function openSheet(entry = null) {
   noteInput.value = entry?.note ?? '';
   dateInput.value = entry?.date ?? todayStr();
   deleteBtn.hidden = !entry;
+  setFixedOn(entry ? isFixed(entry) : false);
 
   setSheetType(entry?.type ?? 'expense');
   renderAmount();
   sheetEl.classList.add('open');
   sheetBackdropEl.classList.add('open');
+}
+
+let fixedOn = false;
+function setFixedOn(on) {
+  fixedOn = !!on;
+  const chip = $('#fixed-chip');
+  chip.classList.toggle('selected', fixedOn);
+  chip.setAttribute('aria-pressed', String(fixedOn));
 }
 
 function closeSheet() {
@@ -1701,6 +1744,8 @@ async function onSave() {
     note: noteInput.value.trim(),
     date: dateInput.value || todayStr(),
   };
+  // 支出才有固定 / 日常之分;明確存 true / false,編輯時才蓋得掉 Recurring 的預設
+  if (sheetType !== 'income') record.fixed = fixedOn;
   if (record.accountId) localStorage.setItem('lastAccountId', record.accountId);
 
   const isNew = !editingId;
@@ -2478,7 +2523,7 @@ function sanitizeEntry(e) {
     // 以下皆 optional:舊備份沒有這些欄位也照常匯入
     ...(typeof e.accountId === 'string' && e.accountId ? { accountId: e.accountId } : {}),
     ...(typeof e.recurringId === 'string' && e.recurringId ? { recurringId: e.recurringId } : {}),
-    ...(e.fixed === true ? { fixed: true } : {}),
+    ...(typeof e.fixed === 'boolean' ? { fixed: e.fixed } : {}),
   };
 }
 
@@ -3836,6 +3881,7 @@ lockScreenEl.querySelector('#lock-face-btn').addEventListener('click', async () 
 
 $('#detail-back-btn').addEventListener('click', closeCatDetail);
 $('#trends-back-btn').addEventListener('click', closeTrends);
+$('#fixed-chip').addEventListener('click', () => setFixedOn(!fixedOn));
 $('#trends-row').addEventListener('click', () => { trendRange = 6; openTrends(); });
 $('#networth-row').addEventListener('click', () => { openCatModal(); showSettingsPage('accounts', 'accountsSection'); });
 
