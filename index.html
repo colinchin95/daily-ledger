@@ -61,24 +61,19 @@
         <button id="backup-banner-now" class="backup-banner-btn backup-banner-now" type="button" data-i18n="backupNow">Back up now</button>
       </div>
     </div>
-    <div class="search-bar">
-      <svg class="search-icon" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-      <input id="search-input" class="search-input" type="search" data-i18n-ph="searchPlaceholder" placeholder="Search note, category or amount" autocomplete="off">
-      <button id="search-clear" class="search-clear" type="button" aria-label="clear" hidden>✕</button>
+    <div class="search-row">
+      <div class="search-bar">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="m20 20-3.2-3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        <input id="search-input" class="search-input" type="search" data-i18n-ph="searchPlaceholder" placeholder="Search note, category or amount" autocomplete="off">
+        <button id="search-clear" class="search-clear" type="button" aria-label="clear" hidden>✕</button>
+      </div>
+      <!-- 匯入銀行 / 信用卡對帳單:縮成搜尋框右側的小 icon -->
+      <button id="import-stmt-btn" class="icon-btn" type="button" aria-label="Import bank or credit card statement" title="Import statement">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 10v7m0 0-3-3m3 3 3-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
     </div>
     <div id="note-chips" class="note-chips" hidden></div>
     <div id="search-summary" class="search-summary num" hidden></div>
-    <div class="import-row">
-      <button id="scan-receipt-btn" class="import-btn" type="button">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M7 12h10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-        <span data-i18n="scanReceipt">Scan receipt</span>
-      </button>
-      <button id="import-stmt-btn" class="import-btn" type="button">
-        <svg viewBox="0 0 24 24" fill="none"><path d="M6 3h9l3 3v15H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 9h6M9 13h6M9 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
-        <span data-i18n="importStatement">Import Bank / Credit card statement</span>
-      </button>
-    </div>
-    <input id="scan-receipt-input" type="file" accept="image/*" hidden>
     <input id="stmt-input" type="file" accept=".csv,.pdf,image/*" hidden>
 
     <!-- 對帳單匯入進度:填滿的部分是已完成的真實階段,剩餘部分跑掃描動畫 -->

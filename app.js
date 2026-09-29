@@ -752,6 +752,46 @@ function setCurrency(code) {
   if (detailCatId !== null) renderCatDetail();
 }
 
+// ---------- 共用帳目列(明細頁、分類明細頁) ----------
+// 主行 = 備註(沒有備註就顯示子分類);副行 = 分類色點 + 子分類 · 帳戶;右側金額。一律單行,過長截斷。
+function entryRow(entry, { cats = catMap(), showDate = false, hideCategory = null } = {}) {
+  const cat = cats.get(entry.categoryId);
+  const isIncome = entry.type === 'income';
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'entry-row';
+  row.innerHTML = `
+    ${showDate ? '<span class="er-date"></span>' : ''}
+    <span class="er-main">
+      <span class="er-title"></span>
+      <span class="er-sub"><span class="cat-dot"></span><span class="er-sub-text"></span></span>
+    </span>
+    <span class="er-amount num"></span>`;
+  if (showDate) row.querySelector('.er-date').textContent = shortDate(entry.date);
+  const catText = cat ? catName(cat) : t('uncategorized');
+  row.querySelector('.er-title').textContent = entry.note || catText;
+  // 副行:在分類明細頁裡母分類不用重複,其他地方顯示子分類(或分類)名
+  const bits = [];
+  if (entry.note || (cat && cat.parentId)) {
+    const label = entry.note ? catText : catName(rootCat(cat, cats));
+    // 分類明細頁已經在看這個母分類,不重複顯示
+    const redundant = hideCategory && (cat?.id === hideCategory || (!entry.note && rootCat(cat, cats)?.id === hideCategory));
+    if (!redundant) bits.push(label);
+  }
+  if (accounts.length > 1) {
+    const acct = acctMap().get(entry.accountId || accounts[0]?.id);
+    if (acct) bits.push(acctName(acct));
+  }
+  if (isFixed(entry)) bits.push(t('fixedShort'));
+  row.querySelector('.cat-dot').style.background = catColor(cat, cats);
+  row.querySelector('.er-sub-text').textContent = bits.join(' · ');
+  const amt = row.querySelector('.er-amount');
+  amt.textContent = (isIncome ? '+' : '') + formatRM(entry.amountCents);
+  amt.classList.toggle('income-text', isIncome);
+  row.addEventListener('click', () => openSheet(entry));
+  return row;
+}
+
 // ---------- 固定 / 日常支出 ----------
 // fixed === true → 固定;fixed === false → 使用者明確取消;沒有這個欄位 → 由 Recurring 規則產生的就算固定
 const isFixed = (e) => e.type !== 'income' && (e.fixed === true || (e.fixed !== false && !!e.recurringId));
@@ -902,39 +942,7 @@ function renderList() {
       listEl.appendChild(group);
     }
 
-    const cat = cats.get(entry.categoryId);
-    const isIncome = entry.type === 'income';
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = 'entry-card';
-    card.innerHTML = `
-      <span class="cat-dot"></span>
-      <span class="entry-main">
-        <span class="entry-cat"></span>
-        <div class="entry-note" hidden></div>
-      </span>
-      <span class="entry-amount"></span>`;
-    card.querySelector('.cat-dot').style.background = catColor(cat, cats);
-    card.querySelector('.entry-cat').textContent = catLabel(cat, cats);
-    if (accounts.length > 1) {
-      const acct = acctMap().get(entry.accountId || accounts[0]?.id);
-      if (acct) {
-        const tag = document.createElement('span');
-        tag.className = 'entry-acct';
-        tag.textContent = acctName(acct);
-        card.querySelector('.entry-cat').after(tag);
-      }
-    }
-    if (entry.note) {
-      const noteEl = card.querySelector('.entry-note');
-      noteEl.textContent = entry.note;
-      noteEl.hidden = false;
-    }
-    const amountEl = card.querySelector('.entry-amount');
-    amountEl.textContent = (isIncome ? '+' : '') + formatRM(entry.amountCents);
-    amountEl.classList.toggle('income-text', isIncome);
-    card.addEventListener('click', () => openSheet(entry));
-    groupCardEl.appendChild(card);
+    groupCardEl.appendChild(entryRow(entry, { cats }));
   }
 }
 
@@ -1549,28 +1557,7 @@ function renderCatDetail() {
   }
 
   for (const entry of rows) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'cat-row detail-row';
-    item.innerHTML = `
-      <span class="detail-date"></span>
-      <span class="detail-note"></span>
-      <span class="detail-amount num"></span>`;
-    item.querySelector('.detail-date').textContent = shortDate(entry.date);
-    const noteEl = item.querySelector('.detail-note');
-    const entryCat = cats.get(entry.categoryId);
-    const subName = entryCat && entryCat.id !== detailCatId ? catName(entryCat) : '';
-    if (entry.note) {
-      noteEl.textContent = subName ? `${entry.note} · ${subName}` : entry.note;
-    } else {
-      noteEl.textContent = subName || catName(cat);
-      noteEl.classList.add('muted');
-    }
-    const amtEl = item.querySelector('.detail-amount');
-    amtEl.textContent = (isIncome ? '+' : '') + formatRM(entry.amountCents);
-    amtEl.classList.toggle('income-text', isIncome);
-    item.addEventListener('click', () => openSheet(entry));
-    detailListEl.appendChild(item);
+    detailListEl.appendChild(entryRow(entry, { cats, showDate: true, hideCategory: detailCatId }));
   }
 }
 
@@ -3504,17 +3491,6 @@ $('#receipt-input').addEventListener('change', (e) => {
 
 // ---------- 明細頁頂部:掃收據 / 匯入對帳單 ----------
 
-// 明細頁的「掃描收據」= 開記帳頁再觸發既有的收據流程,避免兩套邏輯
-$('#scan-receipt-btn').addEventListener('click', () => $('#scan-receipt-input').click());
-$('#scan-receipt-input').addEventListener('change', (e) => {
-  const file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
-  openSheet();
-  setSheetType('expense');
-  onReceiptFile(file);
-});
-
 $('#import-stmt-btn').addEventListener('click', () => $('#stmt-input').click());
 $('#stmt-input').addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -3555,10 +3531,8 @@ async function onStatementFile(file) {
   if (!file) return;
   if (!ensureAiConsent('statement')) return;
   const btn = $('#import-stmt-btn');
-  const label = btn.querySelector('span');
-  const original = label.textContent;
   btn.disabled = true;
-  label.textContent = t('reconBusy');
+  btn.classList.add('busy');
   stmtProgress(0);                       // 讀取檔案
   try {
     const names = aiCategoryLabels('expense');
@@ -3609,7 +3583,7 @@ async function onStatementFile(file) {
     // 還在 busy = 中途失敗,直接收掉(成功路徑已由 stmtProgressDone 收尾)
     if ($('#stmt-progress-track').classList.contains('busy')) stmtProgress(null);
     btn.disabled = false;
-    label.textContent = original;
+    btn.classList.remove('busy');
   }
 }
 
