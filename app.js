@@ -202,6 +202,40 @@ const STRINGS = {
     proBenefit2: 'Bank & credit card statement import',
     proBenefit3: 'No ads',
     proBenefit4: '60+ Malaysian 3D category icons',
+    rateApp: 'Rate RichAuntie',
+    rateAppValue: '★★★★★',
+    instRetirement: 'Retirement',
+    epfAcctHint: "Your EPF contributions from payslips (yours + employer's) are added automatically. Update the balance anytime from KWSP i-Akaun.",
+    payslipChip: 'Payslip',
+    payslipChipDone: 'Payslip ✓',
+    payslipTitle: 'Payslip',
+    scanPayslip: 'Scan payslip photo',
+    scanningPayslip: 'Reading payslip…',
+    payslipFailed: "Couldn't read the payslip — please fill it in manually.",
+    aiConsentPayslip: 'Scanning a payslip sends this photo over an encrypted connection to our processing endpoint, then on to Anthropic (Claude) to read the salary figures. The image is not stored and is not used to train models. Continue?',
+    psEarnings: 'Earnings',
+    psGross: 'Gross pay',
+    psDeductions: 'Your deductions',
+    psEpf: 'EPF',
+    psSocso: 'SOCSO',
+    psEis: 'EIS',
+    psPcb: 'PCB (income tax)',
+    psZakat: 'Zakat',
+    psOther: 'Other deductions',
+    psEmployer: 'Employer contributions',
+    psErEpf: 'EPF (employer)',
+    psErSocso: 'SOCSO (employer)',
+    psErEis: 'EIS (employer)',
+    psNet: 'Net pay',
+    psNetHint: 'Net pay is saved as the income amount.',
+    psEstimate: 'Estimate EPF, SOCSO & EIS from gross pay',
+    psEpfAdds: (amt, name) => `${amt} (yours + employer's) will be added to ${name}.`,
+    psNoEpf: "Tip: add an EPF (KWSP) account in Settings → Accounts to track your EPF balance automatically.",
+    psRemove: 'Remove payslip details',
+    psYear: (y) => `Payslips · ${y}`,
+    psYearHint: 'Totals for the year — handy for e-Filing (Form BE).',
+    psEpfTotal: 'EPF (you + employer)',
+    psSocsoEis: 'SOCSO + EIS',
     iconLabel: 'Icon',
     iconDefault: 'Default',
     chooseIcon: 'Choose icon',
@@ -406,7 +440,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5';
-const WEB_BUILD = 19;
+const WEB_BUILD = 20;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -690,6 +724,10 @@ const CATEGORY_NAMES = {
   salary: 'Salary',
   bonus: 'Bonus',
   investment: 'Investment',
+  business: 'Business',
+  rental: 'Rental Income',
+  gifts: 'Gifts & Angpao',
+  refunds: 'Refunds & Aid',
   'other-income': 'Other Income',
 };
 
@@ -751,11 +789,48 @@ function acctBalance(a) {
   const fallback = accounts[0]?.id;
   let cents = a.openingCents || 0;
   for (const e of entries) {
+    // 薪資單上的員工 + 雇主 EPF 自動進 EPF 帳戶
+    if (e.payslip?.epfAccountId === a.id) cents += (e.payslip.epf || 0) + (e.payslip.erEpf || 0);
     const aid = e.accountId || fallback;
     if (aid !== a.id) continue;
     cents += e.type === 'income' ? e.amountCents : -e.amountCents;
   }
   return cents;
+}
+
+// ---------- 薪資單(馬來西亞) ----------
+// entry.payslip = { gross, epf, socso, eis, pcb, zakat, other, erEpf, erSocso, erEis, epfAccountId? }(分,全 optional)
+// 收入金額存「實領」;扣款與雇主提撥另外記,年底報稅(Form BE)用得到。
+const PS_FIELDS = ['gross', 'epf', 'socso', 'eis', 'pcb', 'zakat', 'other', 'erEpf', 'erSocso', 'erEis'];
+const PS_DEDUCT = ['epf', 'socso', 'eis', 'pcb', 'zakat', 'other'];
+const PAYSLIP_ROOTS = new Set(['salary', 'bonus']);
+const psNet = (p) => (p.gross || 0) - PS_DEDUCT.reduce((sum, k) => sum + (p[k] || 0), 0);
+
+function sanitizePayslip(p) {
+  if (!p || typeof p !== 'object') return null;
+  const out = {};
+  for (const k of PS_FIELDS) {
+    const v = Math.round(Number(p[k]));
+    if (Number.isFinite(v) && v > 0) out[k] = Math.min(v, 1e10);
+  }
+  if (!out.gross) return null;
+  if (typeof p.epfAccountId === 'string' && p.epfAccountId) out.epfAccountId = p.epfAccountId;
+  return out;
+}
+
+// 法定提撥估算(2024-10 起):EPF 員工 11%、雇主 13%(月薪 ≤ RM5,000)/ 12%,EPF 表以整數令吉進位;
+// SOCSO 員工 0.5% / 雇主 1.75%、EIS 各 0.2%,工資上限 RM6,000。僅供參考,實際以薪資單為準。
+function estimateStatutory(grossCents) {
+  const g = grossCents / 100;
+  const cap = Math.min(g, 6000);
+  return {
+    epf: Math.ceil(g * 0.11) * 100,
+    erEpf: Math.ceil(g * (g <= 5000 ? 0.13 : 0.12)) * 100,
+    socso: Math.round(cap * 0.5),
+    erSocso: Math.round(cap * 1.75),
+    eis: Math.round(cap * 0.2),
+    erEis: Math.round(cap * 0.2),
+  };
 }
 
 function defaultAcctId() {
@@ -1537,6 +1612,37 @@ function renderCatDetail() {
   detailSummaryEl.querySelector('.detail-sub').textContent =
     `${monthFmt.format(new Date(reportMonth.y, reportMonth.m - 1, 1))} · ${t('entryCount', rows.length)}`;
 
+  // Salary / Bonus:本年度薪資單合計(報稅用)
+  if (isIncome && cat && PAYSLIP_ROOTS.has(cat.id)) {
+    const yr = String(reportMonth.y);
+    const slips = entries.filter((e) => e.type === 'income' && e.payslip && inCat(e) && e.date.startsWith(yr));
+    if (slips.length) {
+      const sum = (k) => slips.reduce((acc, e) => acc + (e.payslip[k] || 0), 0);
+      const lines = [
+        ['psGross', sum('gross')],
+        ['psPcb', sum('pcb')],
+        ['psEpfTotal', sum('epf') + sum('erEpf')],
+        ['psSocsoEis', sum('socso') + sum('eis')],
+        ['psZakat', sum('zakat')],
+        ['psNet', slips.reduce((acc, e) => acc + psNet(e.payslip), 0)],
+      ].filter(([, v], i) => v > 0 || i === 0);
+      const card = document.createElement('div');
+      card.className = 'ps-year';
+      card.innerHTML = `<div class="ps-year-head"></div><div class="ps-year-hint"></div>`;
+      card.querySelector('.ps-year-head').textContent = t('psYear', yr) + ` · ${t('entryCount', slips.length)}`;
+      card.querySelector('.ps-year-hint').textContent = t('psYearHint');
+      for (const [k, v] of lines) {
+        const r = document.createElement('div');
+        r.className = 'ps-year-row';
+        r.innerHTML = `<span></span><span class="num"></span>`;
+        r.firstChild.textContent = t(k);
+        r.lastChild.textContent = formatRM(v);
+        card.appendChild(r);
+      }
+      detailSummaryEl.appendChild(card);
+    }
+  }
+
   // 本分類本月最大一筆(從報表首頁的數據卡移過來)
   if (!isIncome && rows.length) {
     const top = rows.reduce((x, y) => (y.amountCents > x.amountCents ? y : x));
@@ -1657,6 +1763,10 @@ const CAT_ICONS = {
   bonus: '<rect x="4" y="10" width="16" height="10" rx="1.5"/><path d="M3 7h18v3H3zM12 7v13"/><path d="M12 7c-2-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3-2-5 1Z"/>',
   investment: '<path d="M4 18 10 12l4 4 6-7"/><path d="M15 9h5v5"/>',
   'other-income': '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>',
+  business: '<path d="M4 9l1.5-4h13L20 9"/><path d="M4 9h16v1.5a2.7 2.7 0 0 1-5.3 0 2.7 2.7 0 0 1-5.4 0A2.7 2.7 0 0 1 4 10.5Z"/><path d="M5.5 13v7h13v-7"/><path d="M10 20v-4h4v4"/>',
+  rental: '<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><circle cx="12" cy="13" r="2"/><path d="M12 15v4M12 17.5h1.5"/>',
+  gifts: '<rect x="6" y="3" width="12" height="18" rx="2"/><path d="M6 8c2.5 2 9.5 2 12 0"/><circle cx="12" cy="10.5" r="1.6"/>',
+  refunds: '<path d="M20 12a8 8 0 1 1-2.4-5.7"/><path d="M20 4v4h-4"/><path d="M9 12.5l2 2 4-4.5"/>',
 };
 // Pro 3D 圖示包(icons/cat3d/*.webp,128px)。分類存 icon: '3d:<id>'
 const ICON_PACK = [
@@ -1767,6 +1877,7 @@ function renderCategoryChips() {
     categoryRowEl.appendChild(more);
   }
   renderSubcatChips(selectedRoot);
+  updatePayslipChip();
 }
 
 // 選了有子分類的母分類 → 下方出現子分類列(預設「General」= 母分類本身)
@@ -1845,6 +1956,7 @@ function openSheet(entry = null) {
   amountStr = entry ? centsToInputStr(entry.amountCents) : '';
   selectedCatId = entry?.categoryId ?? null;
   selectedAcctId = entry?.accountId ?? defaultAcctId();
+  pendingPayslip = entry?.payslip ? { ...entry.payslip } : null;
   renderAccountChips();
   noteInput.value = entry?.note ?? '';
   dateInput.value = entry?.date ?? todayStr();
@@ -1891,6 +2003,164 @@ function pressKey(key) {
   updateSaveState();
 }
 
+// ---------- 薪資單面板 ----------
+let pendingPayslip = null;   // 記帳面板目前的薪資單明細(分)
+
+function payslipEligible() {
+  if (sheetType !== 'income') return false;
+  const root = rootCat(catMap().get(selectedCatId));
+  return !!root && PAYSLIP_ROOTS.has(root.id);
+}
+function epfAccount() {
+  return accounts.find((a) => acctInst(a)?.id === 'epf') || null;
+}
+function updatePayslipChip() {
+  const chip = $('#payslip-chip');
+  const on = payslipEligible();
+  chip.hidden = !on;
+  chip.classList.toggle('selected', on && !!pendingPayslip);
+  chip.textContent = pendingPayslip ? t('payslipChipDone') : t('payslipChip');
+}
+
+const PS_LAYOUT = [
+  ['psEarnings', [['gross', 'psGross']]],
+  ['psDeductions', [['epf', 'psEpf'], ['socso', 'psSocso'], ['eis', 'psEis'], ['pcb', 'psPcb'], ['zakat', 'psZakat'], ['other', 'psOther']]],
+  ['psEmployer', [['erEpf', 'psErEpf'], ['erSocso', 'psErSocso'], ['erEis', 'psErEis']]],
+];
+
+function openPayslipSheet() {
+  const body = $('#ps-fields');
+  body.innerHTML = '';
+  const src = pendingPayslip || {};
+  const sym = currencySymbol();
+  for (const [groupKey, fields] of PS_LAYOUT) {
+    const h = document.createElement('div');
+    h.className = 'section-label';
+    h.textContent = t(groupKey);
+    body.appendChild(h);
+    const list = document.createElement('div');
+    list.className = 'cat-list ps-list';
+    for (const [k, labelKey] of fields) {
+      const row = document.createElement('label');
+      row.className = 'cat-row ps-row';
+      row.innerHTML = `<span class="cat-row-name"></span><span class="ps-prefix"></span><input class="ps-input num" type="text" inputmode="decimal" placeholder="0.00">`;
+      row.querySelector('.cat-row-name').textContent = t(labelKey);
+      row.querySelector('.ps-prefix').textContent = sym;
+      const inp = row.querySelector('input');
+      inp.dataset.k = k;
+      inp.value = src[k] ? centsToInputStr(src[k]) : '';
+      inp.addEventListener('input', renderPayslipTotals);
+      list.appendChild(row);
+    }
+    body.appendChild(list);
+  }
+  $('#ps-remove').hidden = !pendingPayslip;
+  renderPayslipTotals();
+  $('#payslip-sheet').classList.add('open');
+  $('#payslip-backdrop').classList.add('open');
+}
+function closePayslipSheet() {
+  document.activeElement?.blur?.();
+  $('#payslip-sheet').classList.remove('open');
+  $('#payslip-backdrop').classList.remove('open');
+}
+function readPayslipForm() {
+  const p = {};
+  document.querySelectorAll('#ps-fields .ps-input').forEach((inp) => {
+    const c = parseMoney(inp.value);
+    if (c > 0) p[inp.dataset.k] = c;
+  });
+  return p;
+}
+function renderPayslipTotals() {
+  const p = readPayslipForm();
+  const net = psNet(p);
+  const netEl = $('#ps-net-amt');
+  netEl.textContent = (net < 0 ? '−' : '') + formatRM(Math.abs(net));
+  netEl.classList.toggle('negative-text', net < 0);
+  const note = $('#ps-epf-note');
+  const epfA = epfAccount();
+  const epfSum = (p.epf || 0) + (p.erEpf || 0);
+  note.textContent = epfA ? (epfSum > 0 ? t('psEpfAdds', formatRM(epfSum), acctName(epfA)) : '') : t('psNoEpf');
+  note.hidden = !note.textContent;
+  $('#ps-done').disabled = !(p.gross > 0) || net <= 0;
+}
+function onPayslipEstimate() {
+  const p = readPayslipForm();
+  if (!(p.gross > 0)) { document.querySelector('#ps-fields .ps-input[data-k="gross"]')?.focus(); return; }
+  const est = estimateStatutory(p.gross);
+  for (const [k, v] of Object.entries(est)) {
+    const inp = document.querySelector(`#ps-fields .ps-input[data-k="${k}"]`);
+    if (inp) inp.value = centsToInputStr(v);
+  }
+  renderPayslipTotals();
+}
+function onPayslipDone() {
+  const p = sanitizePayslip({ ...readPayslipForm(), epfAccountId: pendingPayslip?.epfAccountId });
+  if (!p) return;
+  pendingPayslip = p;
+  const net = psNet(p);
+  if (net > 0) { amountStr = centsToInputStr(net); renderAmount(); }
+  updatePayslipChip();
+  updateSaveState();
+  closePayslipSheet();
+}
+function onPayslipRemove() {
+  pendingPayslip = null;
+  updatePayslipChip();
+  closePayslipSheet();
+}
+
+// 薪資單照片 → AI 讀出各欄位(與收據共用額度)
+async function onPayslipFile(file) {
+  if (!file) return;
+  if (!ensureAiConsent('payslip')) return;
+  const btn = $('#ps-scan-btn');
+  const label = btn.querySelector('span');
+  const original = label.textContent;
+  btn.disabled = true;
+  btn.classList.add('busy');
+  label.textContent = t('scanningPayslip');
+  try {
+    const image = await fileToBase64(file, 1800, 0.8);   // 薪資單字小,解析度給高一點
+    const res = await fetch(RECEIPT_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image, mediaType: 'image/jpeg', kind: 'payslip', installId: getInstallId() }),
+    });
+    if (!res.ok) {
+      let e = {};
+      try { e = await res.json(); } catch {}
+      if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
+      else if (res.status === 429) alert(t('receiptRate'));
+      else if (res.status === 503) alert(t('receiptBusy'));
+      else alert(t('payslipFailed'));
+      return;
+    }
+    const r = await res.json();
+    const map = { gross: 'gross', epf: 'epfEmployee', socso: 'socsoEmployee', eis: 'eisEmployee', pcb: 'pcb', zakat: 'zakat',
+      other: 'otherDeductions', erEpf: 'epfEmployer', erSocso: 'socsoEmployer', erEis: 'eisEmployer' };
+    let any = false;
+    for (const [k, rk] of Object.entries(map)) {
+      const v = Number(r[rk]);
+      const inp = document.querySelector(`#ps-fields .ps-input[data-k="${k}"]`);
+      if (!inp) continue;
+      inp.value = Number.isFinite(v) && v > 0 ? centsToInputStr(Math.round(v * 100)) : '';
+      if (k === 'gross' && v > 0) any = true;
+    }
+    if (typeof r.payDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.payDate)) { dateInput.value = r.payDate; renderDateChips(); }
+    if (r.employer && !noteInput.value.trim()) noteInput.value = String(r.employer).slice(0, 60);
+    renderPayslipTotals();
+    if (!any) alert(t('payslipFailed'));
+  } catch {
+    alert(t('payslipFailed'));
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('busy');
+    label.textContent = original;
+  }
+}
+
 // ---------- 儲存 / 刪除 帳目 ----------
 async function onSave() {
   const amountCents = toCents(amountStr);
@@ -1906,13 +2176,24 @@ async function onSave() {
   };
   // 支出才有固定 / 日常之分;明確存 true / false,編輯時才蓋得掉 Recurring 的預設
   if (sheetType !== 'income') record.fixed = fixedOn;
+  // 薪資單明細(只有 Salary / Bonus 收入才存)
+  if (payslipEligible() && pendingPayslip) {
+    const ps = { ...pendingPayslip };
+    const epfId = ps.epfAccountId && accounts.some((a) => a.id === ps.epfAccountId) ? ps.epfAccountId : epfAccount()?.id;
+    if (epfId) ps.epfAccountId = epfId; else delete ps.epfAccountId;
+    record.payslip = ps;
+  }
   if (record.accountId) localStorage.setItem('lastAccountId', record.accountId);
 
   const isNew = !editingId;
 
   if (editingId) {
     const idx = entries.findIndex((e) => e.id === editingId);
-    if (idx >= 0) entries[idx] = { ...entries[idx], ...record };
+    if (idx >= 0) {
+      const merged = { ...entries[idx], ...record };
+      if (!record.payslip) delete merged.payslip;
+      entries[idx] = merged;
+    }
   } else {
     entries.push({ id: crypto.randomUUID(), createdAt: Date.now(), ...record });
   }
@@ -2067,6 +2348,7 @@ function openAcctEditor(acct, instId = null) {
     head.appendChild(nm);
   }
   head.hidden = !inst;
+  $('.acct-bal-hint').textContent = inst?.id === 'epf' ? t('epfAcctHint') : t('currentBalanceHint');
   $('#acct-color-grid').hidden = !!inst;
   renderAcctColorGrid();
   $('#acct-delete-btn').hidden = !acct || accounts.length <= 1;
@@ -2124,7 +2406,7 @@ function renderInstPicker() {
   const body = $('#inst-list');
   body.innerHTML = '';
   const match = (x) => !q || x.name.toLowerCase().includes(q) || x.short.toLowerCase().includes(q) || x.id.includes(q);
-  const groups = [['ewallet', t('instEwallets')], ['bank', t('instBanks')], ['other', t('instOther')]];
+  const groups = [['ewallet', t('instEwallets')], ['bank', t('instBanks')], ['retirement', t('instRetirement')], ['other', t('instOther')]];
   for (const [kind, title] of groups) {
     const items = INSTITUTIONS.filter((x) => x.kind === kind && match(x));
     if (!items.length) continue;
@@ -2224,7 +2506,7 @@ function showSettingsPage(page, titleKey) {
   catModalEl.scrollTop = 0;
 }
 
-document.querySelectorAll('#settings-hub .settings-row').forEach((row) => {
+document.querySelectorAll('#settings-hub .settings-row[data-page]').forEach((row) => {
   row.addEventListener('click', () => showSettingsPage(row.dataset.page, row.dataset.titleKey));
 });
 settingsBackBtn.addEventListener('click', showSettingsHub);
@@ -2790,6 +3072,7 @@ function sanitizeEntry(e) {
     ...(typeof e.accountId === 'string' && e.accountId ? { accountId: e.accountId } : {}),
     ...(typeof e.recurringId === 'string' && e.recurringId ? { recurringId: e.recurringId } : {}),
     ...(typeof e.fixed === 'boolean' ? { fixed: e.fixed } : {}),
+    ...(e.type === 'income' && sanitizePayslip(e.payslip) ? { payslip: sanitizePayslip(e.payslip) } : {}),
   };
 }
 
@@ -3427,7 +3710,7 @@ async function fileToBase64(file, maxDim = 1280, quality = 0.7) {
 function ensureAiConsent(kind) {
   const key = 'aiConsent:' + kind;
   if (localStorage.getItem(key) === '1') return true;
-  const ok = confirm(t(kind === 'receipt' ? 'aiConsentReceipt' : 'aiConsentStatement'));
+  const ok = confirm(t(kind === 'receipt' ? 'aiConsentReceipt' : kind === 'payslip' ? 'aiConsentPayslip' : 'aiConsentStatement'));
   if (ok) localStorage.setItem(key, '1');
   return ok;
 }
@@ -4148,6 +4431,15 @@ $('#trends-back-btn').addEventListener('click', closeTrends);
 $('#fixed-chip').addEventListener('click', () => setFixedOn(!fixedOn));
 $('#account-picker').addEventListener('click', openAccountPick);
 $('#cat-icon-field').addEventListener('click', openIconSheet);
+$('#payslip-chip').addEventListener('click', openPayslipSheet);
+$('#ps-cancel').addEventListener('click', closePayslipSheet);
+$('#payslip-backdrop').addEventListener('click', closePayslipSheet);
+$('#ps-done').addEventListener('click', onPayslipDone);
+$('#ps-estimate').addEventListener('click', onPayslipEstimate);
+$('#ps-remove').addEventListener('click', onPayslipRemove);
+$('#ps-scan-btn').addEventListener('click', () => $('#payslip-input').click());
+$('#payslip-input').addEventListener('change', (ev) => { const f = ev.target.files?.[0]; ev.target.value = ''; onPayslipFile(f); });
+document.querySelectorAll('.rate-app-row').forEach((b) => b.addEventListener('click', openRateApp));
 $('#icon-cancel').addEventListener('click', closeIconSheet);
 $('#icon-backdrop').addEventListener('click', closeIconSheet);
 $('#pick-cancel').addEventListener('click', closePick);
@@ -4254,6 +4546,16 @@ const isIOSNative = () => IS_NATIVE && window.Capacitor?.getPlatform?.() === 'io
 function openExternal(url) {
   // Capacitor 會把非 App 內的網址 / scheme 交給系統開(iCloud 捷徑連結 → 捷徑 App)
   window.open(url, '_blank');
+}
+
+// 評分:iOS 直接開 App Store 撰寫評論頁;Android 開 Play 商店頁;Web 開 App Store 頁
+const APP_STORE_ID = '6781631334';
+const PLAY_PACKAGE = 'com.centsei.app';
+function openRateApp() {
+  const platform = window.Capacitor?.getPlatform?.();
+  if (platform === 'android') openExternal(`https://play.google.com/store/apps/details?id=${PLAY_PACKAGE}`);
+  else if (platform === 'ios') openExternal(`itms-apps://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`);
+  else openExternal(`https://apps.apple.com/app/id${APP_STORE_ID}?action=write-review`);
 }
 
 function openQuickAddSettings() {

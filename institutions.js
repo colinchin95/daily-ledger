@@ -4,7 +4,7 @@
 // ⚠️ 使用者決定採用官方 logo(已告知 Apple 5.2.1 / Google Play 商標風險);若審核或品牌方要求移除,
 //    刪掉該筆的 logo 欄位即自動退回品牌色 + 簡稱徽章。
 //
-// kind:bank / ewallet / other。id 固定,存進帳戶的 inst 欄位,同步到別台裝置也對得上。
+// kind:bank / ewallet / retirement / other。id 固定,存進帳戶的 inst 欄位,同步到別台裝置也對得上。
 
 export const INSTITUTIONS = [
   // ---- 電子錢包 ----
@@ -40,6 +40,10 @@ export const INSTITUTIONS = [
   { id: 'gxbank',     name: 'GXBank',              short: 'GX',    bg: '#5B2DDC', fg: '#FFFFFF', kind: 'bank', logo: 'icons/banks/gxbank.png' },
   { id: 'aeonbank',   name: 'AEON Bank',           short: 'AEON',  bg: '#B6007A', fg: '#FFFFFF', kind: 'bank', logo: 'icons/banks/aeonbank.png' },
   { id: 'boostbank',  name: 'Boost Bank',          short: 'Boost', bg: '#C8102E', fg: '#FFFFFF', kind: 'bank', logo: 'icons/banks/boostbank.png' },
+
+  // ---- 退休金 ----
+  // EPF:餘額 = 期初 + 薪資單上的員工 + 雇主 EPF(自動加)+ 記到這個帳戶的股息
+  { id: 'epf',        name: 'EPF (KWSP)',          short: 'EPF',   bg: '#1B3F8F', fg: '#FFFFFF', kind: 'retirement', logo: 'icons/banks/epf.png' },
 
   // ---- 其他 ----
   { id: 'cash',       name: 'Cash',                short: 'RM',    bg: '#6E8B4A', fg: '#FFFFFF', kind: 'other' },

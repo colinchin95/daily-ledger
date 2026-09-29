@@ -64,19 +64,46 @@ const DEFAULT_SUBCATEGORIES = [
   return { id, name, color: parent.color, type: 'expense', parentId };
 });
 
+// 收入分類(v1.6 擴充):馬來西亞常見收入來源。順序即顯示順序(8 個剛好一格排滿)
 const DEFAULT_INCOME_CATEGORIES = [
-  { id: 'salary',       name: 'Salary',       color: '#6E8B4A', type: 'income' },
-  { id: 'bonus',        name: 'Bonus',        color: '#C69A4E', type: 'income' },
-  { id: 'investment',   name: 'Investment',   color: '#3E7C8A', type: 'income' },
-  { id: 'other-income', name: 'Other Income', color: '#8A8078', type: 'income' },
+  { id: 'salary',       name: 'Salary',         color: '#6E8B4A', type: 'income' },
+  { id: 'bonus',        name: 'Bonus',          color: '#C69A4E', type: 'income' },
+  { id: 'business',     name: 'Business',       color: '#B0592E', type: 'income' },
+  { id: 'investment',   name: 'Investment',     color: '#3E7C8A', type: 'income' },
+  { id: 'rental',       name: 'Rental Income',  color: '#3A4C94', type: 'income' },
+  { id: 'gifts',        name: 'Gifts & Angpao', color: '#C23F7C', type: 'income' },
+  { id: 'refunds',      name: 'Refunds & Aid',  color: '#2F80D8', type: 'income' },
+  { id: 'other-income', name: 'Other Income',   color: '#8A8078', type: 'income' },
 ];
+
+const DEFAULT_INCOME_SUBCATEGORIES = [
+  ['salary', 'salary-allowance', 'Allowance & OT'],
+  ['salary', 'salary-commission', 'Commission'],
+  ['business', 'business-freelance', 'Freelance'],
+  ['business', 'business-online', 'Online selling'],
+  ['business', 'business-gig', 'Gig / e-hailing'],
+  ['investment', 'inv-dividend', 'Stock dividends'],
+  ['investment', 'inv-asb', 'ASB / Unit trust'],
+  ['investment', 'inv-epf', 'EPF dividend'],
+  ['investment', 'inv-interest', 'FD & interest'],
+  ['investment', 'inv-gains', 'Capital gains'],
+  ['refunds', 'refund-tax', 'Tax refund'],
+  ['refunds', 'refund-aid', 'Govt aid (STR/SARA)'],
+  ['refunds', 'refund-cashback', 'Cashback & rebates'],
+].map(([parentId, id, name]) => {
+  const parent = DEFAULT_INCOME_CATEGORIES.find((c) => c.id === parentId);
+  return { id, name, color: parent.color, type: 'income', parentId };
+});
+
+const KEY_CAT_MIGRATIONS = 'catMigrations';
 
 export async function getCategories() {
   let cats = await get(KEY_CATEGORIES);
   if (!cats || !cats.length) {
     // 新安裝:整套預設(含馬來西亞子分類)。既有用戶不動,避免改到他們的資料。
-    cats = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_SUBCATEGORIES, ...DEFAULT_INCOME_CATEGORIES];
+    cats = [...DEFAULT_EXPENSE_CATEGORIES, ...DEFAULT_SUBCATEGORIES, ...DEFAULT_INCOME_CATEGORIES, ...DEFAULT_INCOME_SUBCATEGORIES];
     await set(KEY_CATEGORIES, cats);
+    await set(KEY_CAT_MIGRATIONS, ['income-v16']);
     return cats;
   }
   // 遷移:舊資料沒有 type → 視為支出;沒有收入分類 → 補預設
@@ -95,6 +122,27 @@ export async function getCategories() {
     const legacyParent = c.parentId && LEGACY_DEFAULT_COLORS[c.parentId];
     if (legacyOwn && c.color === legacyOwn) { c.color = newColor.get(c.id); changed = true; }
     else if (legacyParent && c.color === legacyParent) { c.color = newColor.get(c.parentId); changed = true; }
+  }
+  // 遷移(v1.6):既有用戶補上新的收入分類 / 子分類。只跑一次(使用者之後刪掉的不會再冒出來),
+  // 只補缺的 id,不動使用者已有的分類。
+  const done = (await get(KEY_CAT_MIGRATIONS)) ?? [];
+  if (!done.includes('income-v16')) {
+    const have = new Set(cats.map((c) => c.id));
+    const addTop = DEFAULT_INCOME_CATEGORIES.filter((c) => !have.has(c.id));
+    if (addTop.length) {
+      // 新的頂層插在「Other Income」前面,Other 維持最後
+      const at = cats.findIndex((c) => c.id === 'other-income');
+      const fresh = addTop.filter((c) => c.id !== 'other-income').map((c) => ({ ...c }));
+      if (at >= 0) cats.splice(at, 0, ...fresh); else cats.push(...addTop.map((c) => ({ ...c })));
+    }
+    const parents = new Set(cats.map((c) => c.id));
+    for (const sub of DEFAULT_INCOME_SUBCATEGORIES) {
+      if (have.has(sub.id) || !parents.has(sub.parentId)) continue;
+      const parent = cats.find((c) => c.id === sub.parentId);
+      cats.push({ ...sub, color: parent?.color || sub.color });
+    }
+    changed = true;
+    await set(KEY_CAT_MIGRATIONS, [...done, 'income-v16']);
   }
   if (changed) await set(KEY_CATEGORIES, cats);
   return cats;

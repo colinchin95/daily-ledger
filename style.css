@@ -1816,3 +1816,43 @@ body.has-ad .modal {
 }
 .pb-icon-img { background: none; }
 .pb-icon-img img { width: 34px; height: 34px; object-fit: contain; }
+
+/* ---------- 薪資單 ---------- */
+.payslip-backdrop { z-index: 34; }
+.payslip-sheet { z-index: 35; max-height: 88vh; display: flex; flex-direction: column; }
+.ps-scroll { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 6px; }
+.ps-scan-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin: 6px 0 2px;
+  padding: 12px; border: 1px dashed var(--accent); border-radius: 12px; background: var(--accent-soft);
+  color: var(--accent); font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.ps-scan-btn svg { width: 20px; height: 20px; }
+.ps-scan-btn.busy { opacity: 0.6; }
+.ps-list .ps-row { gap: 6px; cursor: text; }
+.ps-prefix { color: var(--text-3); font-size: 14px; }
+.ps-input {
+  width: 108px; flex: none; border: none; background: none; text-align: right; font: inherit; font-size: 16px;
+  color: var(--text); padding: 2px 0; outline: none;
+}
+.ps-link-btn {
+  display: block; margin: 10px auto 0; border: none; background: none; color: var(--accent);
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.ps-net {
+  display: flex; align-items: baseline; justify-content: space-between; margin-top: 14px; padding: 12px 14px;
+  border-radius: 12px; background: var(--surface-2); font-weight: 600;
+}
+.ps-net-amt { font-size: 20px; color: var(--positive); }
+.ps-epf-note { margin: 6px 2px 0; font-size: 13px; line-height: 1.4; color: var(--text-2); }
+.ps-epf-note[hidden] { display: none; }
+#payslip-chip.selected { color: var(--positive); border-color: var(--positive); background: color-mix(in srgb, var(--positive) 12%, transparent); }
+
+.ps-year { margin-top: 12px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); text-align: left; }
+.ps-year-head { font-weight: 600; font-size: 14px; }
+.ps-year-hint { font-size: 12px; color: var(--text-3); margin: 2px 0 6px; }
+.ps-year-row { display: flex; justify-content: space-between; font-size: 14px; padding: 4px 0; color: var(--text-2); }
+.ps-year-row .num { color: var(--text); }
+
+.rate-stars { color: var(--accent); letter-spacing: 1px; }
+.ps-list .ps-row { position: relative; }
+.ps-list .ps-row + .ps-row::before { left: 0; right: 0; }
