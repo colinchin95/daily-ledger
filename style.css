@@ -1106,9 +1106,9 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 .lock-dot.filled { background: var(--accent); border-color: var(--accent); }
-.lock-dot.error { border-color: var(--negative); background: var(--negative); }
+.lock-dot.error { border-color: var(--warning); background: var(--warning); }
 
-.lock-error { color: var(--negative); font-size: 13px; min-height: 18px; margin-bottom: 8px; }
+.lock-error { color: var(--warning); font-size: 13px; min-height: 18px; margin-bottom: 8px; }
 
 .lock-keypad {
   display: grid;
