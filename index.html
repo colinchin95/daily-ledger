@@ -239,21 +239,30 @@
 
     <!-- 主頁:分組清單 -->
     <div id="settings-hub">
+      <!-- Pro 獨立一列 -->
+      <div class="cat-list settings-hub-list">
+        <button class="cat-row settings-row pro-hub-row" data-page="pro" data-title-key="proTitle" type="button">
+          <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.7 6.2.6-4.7 4.1 1.4 6.1L12 16.9 6.5 19.6l1.4-6.1L3.2 9.3l6.2-.6L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+          <span class="cat-row-name" data-i18n="proTitle">RichAuntie Pro</span>
+          <span id="pro-hub-status" class="cat-row-count"></span>
+          <span class="cat-row-chevron">›</span>
+        </button>
+      </div>
+      <div class="section-label" data-i18n="grpTracking">TRACKING</div>
       <div class="cat-list settings-hub-list">
         <button class="cat-row settings-row" data-page="categories" data-title-key="categoriesSection" type="button">
           <span class="cat-row-name" data-i18n="categoriesSection">Categories</span>
+          <span id="cat-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="accounts" data-title-key="accountsSection" type="button">
           <span class="cat-row-name" data-i18n="accountsSection">Accounts</span>
+          <span id="acct-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="budget" data-title-key="budgetRecurringTitle" type="button">
           <span class="cat-row-name" data-i18n="budgetRecurringTitle">Budget & Recurring</span>
-          <span class="cat-row-chevron">›</span>
-        </button>
-        <button class="cat-row settings-row" data-page="quickadd" data-title-key="quickAddTitle" type="button">
-          <span class="cat-row-name" data-i18n="quickAddTitle">Quick add (Back Tap)</span>
+          <span id="budget-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
         <button class="cat-row settings-row" data-page="currency" data-title-key="currencyTitle" type="button">
@@ -261,10 +270,22 @@
           <span id="currency-current" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
-        <button class="cat-row settings-row" data-page="receipt" data-title-key="receiptSection" type="button">
-          <span class="cat-row-name" data-i18n="receiptSection">Receipt scanning</span>
+      </div>
+      <div class="section-label" data-i18n="grpAutomation">AUTOMATION</div>
+      <div class="cat-list settings-hub-list">
+        <button class="cat-row settings-row" data-page="quickadd" data-title-key="quickAddTitle" type="button">
+          <span class="cat-row-name" data-i18n="quickAddTitle">Quick add (Back Tap)</span>
+          <span id="quickadd-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
+        <button class="cat-row settings-row" data-page="receipt" data-title-key="receiptSection" type="button">
+          <span class="cat-row-name" data-i18n="receiptSection">Receipt scanning</span>
+          <span id="receipt-hub-status" class="cat-row-count"></span>
+          <span class="cat-row-chevron">›</span>
+        </button>
+      </div>
+      <div class="section-label" data-i18n="grpDataSecurity">DATA &amp; SECURITY</div>
+      <div class="cat-list settings-hub-list">
         <button class="cat-row settings-row" data-page="cloud" data-title-key="cloudTitle" type="button">
           <span class="cat-row-name" data-i18n="cloudTitle">RichAuntie Cloud</span>
           <span id="cloud-hub-status" class="cat-row-count"></span>
@@ -277,10 +298,14 @@
         </button>
         <button class="cat-row settings-row" data-page="backup" data-title-key="backupSection" type="button">
           <span class="cat-row-name" data-i18n="backupSection">Backup</span>
+          <span id="backup-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
+      </div>
+      <div class="cat-list settings-hub-list settings-hub-about">
         <button class="cat-row settings-row" data-page="about" data-title-key="aboutTitle" type="button">
           <span class="cat-row-name" data-i18n="aboutTitle">About</span>
+          <span id="about-hub-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
@@ -323,14 +348,28 @@
 
     <!-- 子頁:收據辨識 -->
     <div class="settings-page" data-page="receipt" hidden>
-      <div class="cat-list">
-        <button id="pro-btn" class="cat-row pro-row" type="button">
-          <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M12 3l2.6 5.7 6.2.6-4.7 4.1 1.4 6.1L12 16.9 6.5 19.6l1.4-6.1L3.2 9.3l6.2-.6L12 3z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-          <span class="cat-row-name" id="pro-label" data-i18n="upgradePro">Upgrade to Pro</span>
-          <span id="pro-status" class="cat-row-count"></span>
+      <p class="qa-intro" data-i18n="receiptIntro">Snap a receipt or a payment screenshot and AI fills in the amount, merchant, date and category for you.</p>
+      <p id="receipt-quota-line" class="backup-hint receipt-quota"></p>
+      <div class="cat-list qa-actions">
+        <button id="receipt-to-pro" class="cat-row settings-row-link" type="button">
+          <span class="cat-row-name" data-i18n="proTitle">RichAuntie Pro</span>
+          <span id="receipt-pro-status" class="cat-row-count"></span>
           <span class="cat-row-chevron">›</span>
         </button>
       </div>
+    </div>
+
+    <!-- 子頁:RichAuntie Pro(獨立付費頁) -->
+    <div class="settings-page pro-page" data-page="pro" hidden>
+      <div class="pro-hero">
+        <div class="pro-hero-title" data-i18n="proTitle">RichAuntie Pro</div>
+        <div class="pro-hero-sub" data-i18n="proHeroSub">Log faster. See everything.</div>
+      </div>
+      <ul class="pro-benefits">
+        <li><span class="pb-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 8.5A2.5 2.5 0 0 1 6.5 6h1.6l1.4-2h5l1.4 2h1.6A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle cx="12" cy="12.3" r="3.3" stroke="currentColor" stroke-width="1.7"/></svg></span><span data-i18n="proBenefit1">Unlimited receipt &amp; screenshot scanning</span></li>
+        <li><span class="pb-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3h8l4 4v14H6z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M9 11h6M9 15h6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span data-i18n="proBenefit2">Bank &amp; credit card statement import</span></li>
+        <li><span class="pb-icon"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="5" width="18" height="14" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="m5 5 14 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></span><span data-i18n="proBenefit3">No ads</span></li>
+      </ul>
 
       <!-- 方案:只有一檔 6 個月 -->
       <div id="plan-picker" class="plan-picker" hidden>
@@ -342,6 +381,10 @@
           <span class="plan-price" id="plan-sixmonth-price">—</span>
         </button>
       </div>
+      <button id="pro-btn" class="pro-cta" type="button">
+        <span class="cat-row-name" id="pro-label" data-i18n="upgradePro">Upgrade to Pro</span>
+        <span id="pro-status" class="pro-cta-status"></span>
+      </button>
       <p class="backup-hint pro-hint" id="pro-hint"></p>
       <button id="restore-btn" class="restore-link" type="button" data-i18n="restorePurchase" hidden>Restore purchase</button>
       <p class="backup-hint pro-legal" id="pro-legal" hidden>
@@ -402,7 +445,7 @@
           <span class="cat-row-name" data-i18n="importBackup">Import JSON backup</span>
         </button>
       </div>
-      <p class="backup-hint" data-i18n="backupHint">Your data lives only on this device — export a backup regularly.</p>
+      <p class="backup-hint" id="backup-hint">Your data lives only on this device — export a backup regularly.</p>
       <p class="backup-hint" id="backup-status"></p>
       <input type="file" id="import-file" accept=".json,application/json" hidden>
     </div>
@@ -419,7 +462,7 @@
         <button id="refresh-btn" class="cat-row cat-row-add" type="button">
           <svg class="row-icon" viewBox="0 0 24 24" fill="none"><path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M21 4v5h-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <span class="cat-row-name" data-i18n="updateLatest">Update to latest</span>
-          <span id="app-version" class="cat-row-count"></span>
+          <span id="app-version" class="cat-row-count app-version"></span>
         </button>
       </div>
       <p class="backup-hint" data-i18n="updateHint">Download the latest version and reload. Your data is untouched.</p>

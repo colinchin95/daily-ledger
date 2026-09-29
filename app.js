@@ -184,6 +184,28 @@ const STRINGS = {
     // Cloud sync
     syncSection: 'Cloud Sync',
     syncOn: 'On',
+    statusOff: 'Off',
+    statusSetUp: 'Set up',
+    statusActive: 'Active',
+    statusUpgrade: 'Upgrade',
+    statusUnlimited: 'Unlimited',
+    statusFreeScans: '5 free / month',
+    statusNever: 'Never',
+    statusToday: 'Today',
+    statusDaysAgo: (n) => `${n}d ago`,
+    grpTracking: 'TRACKING',
+    grpAutomation: 'AUTOMATION',
+    grpDataSecurity: 'DATA & SECURITY',
+    proTitle: 'RichAuntie Pro',
+    proHeroSub: 'Log faster. See everything.',
+    proBenefit1: 'Unlimited receipt & screenshot scanning',
+    proBenefit2: 'Bank & credit card statement import',
+    proBenefit3: 'No ads',
+    receiptIntro: 'Snap a receipt or a payment screenshot and AI fills in the amount, merchant, date and category for you.',
+    receiptQuotaFree: 'Free plan: 5 scans a month. Pro makes scanning unlimited.',
+    receiptQuotaPro: 'You have Pro — scanning is unlimited.',
+    backupHintSynced: 'Your data is synced with RichAuntie Cloud. You can still export a backup any time.',
+    backupHintLocal: 'Your data lives only on this device — export a backup regularly.',
     syncOff: 'Off',
     syncSetup: 'Cloud Sync',
     syncIntro: 'Sync with one "sync code". On a new phone, or after deleting and reinstalling, enter the same code to restore. Data is encrypted on your device — the server never sees it.',
@@ -373,7 +395,9 @@ let currency = (() => {
 })();
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
-const APP_VERSION = 'v18';
+// 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
+const APP_MARKETING_VERSION = '1.5';
+const WEB_BUILD = 19;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2168,12 +2192,24 @@ settingsBackBtn.addEventListener('click', showSettingsHub);
 
 // 主頁各列右側的小狀態(目前幣別、是否開同步、是否設鎖)
 function updateSettingsHubStatuses() {
+  const set = (id, txt) => { const el = $(id); if (el) el.textContent = txt; };
   const cur = CURRENCIES.find((c) => c.code === currency);
-  $('#currency-current').textContent = cur ? currency : '';
-  const cloudEl = $('#cloud-hub-status');
-  if (cloudEl) cloudEl.textContent = syncCode ? t('syncOn') : '';
-  const lockEl = $('#lock-hub-status');
-  if (lockEl) lockEl.textContent = pinIsSet() ? t('syncOn') : '';
+  set('#currency-current', cur ? currency : '');
+  set('#pro-hub-status', isPro ? t('statusActive') : t('statusUpgrade'));
+  set('#cat-hub-status', String(catsOfType('expense').length + catsOfType('income').length));
+  set('#acct-hub-status', String(accounts.length));
+  const budget = meta.monthlyBudgetCents ?? 0;
+  set('#budget-hub-status', budget > 0 ? formatRMRound(budget) : t('statusOff'));
+  set('#quickadd-hub-status', isIOSNative() ? (lsGet(BACKTAP_DONE_KEY) === '1' ? t('syncOn') : t('statusSetUp')) : '');
+  set('#receipt-hub-status', isPro ? t('statusUnlimited') : t('statusFreeScans'));
+  set('#cloud-hub-status', syncCode ? t('syncOn') : t('statusOff'));
+  set('#lock-hub-status', pinIsSet() ? t('syncOn') : t('statusOff'));
+  const ts = Number(localStorage.getItem('lastBackupAt'));
+  const d = ts ? daysSince(ts) : null;
+  set('#backup-hub-status', !ts ? t('statusNever') : d <= 0 ? t('statusToday') : t('statusDaysAgo', d));
+  // 收據辨識頁:目前方案說明
+  set('#receipt-quota-line', isPro ? t('receiptQuotaPro') : t('receiptQuotaFree'));
+  set('#receipt-pro-status', isPro ? t('statusActive') : t('statusUpgrade'));
 }
 
 // ---------- 幣別清單 ----------
@@ -2561,7 +2597,27 @@ async function exportCsv() {
 }
 
 // 設定頁:上次備份狀態
+function renderAppVersion() {
+  const paint = (version, build) => {
+    for (const el of [$('#app-version'), $('#about-hub-status')]) {
+      if (!el) continue;
+      el.innerHTML = '';
+      el.append(`v${version}`);
+      const small = document.createElement('small');
+      small.className = 'build-no';
+      small.textContent = ` (${build})`;
+      if (el.id === 'app-version') el.appendChild(small);
+    }
+  };
+  paint(APP_MARKETING_VERSION, `web ${WEB_BUILD}`);
+  const AppPlugin = IS_NATIVE ? window.Capacitor?.Plugins?.App : null;
+  AppPlugin?.getInfo?.().then((info) => { if (info?.version) paint(info.version, `build ${info.build}`); }).catch(() => {});
+}
+
 function updateBackupStatus() {
+  // 開了雲端同步就不能說「資料只在這台裝置上」
+  const hint = $('#backup-hint');
+  if (hint) hint.textContent = syncCode ? t('backupHintSynced') : t('backupHintLocal');
   const ts = Number(localStorage.getItem('lastBackupAt'));
   if (!ts) { backupStatusEl.textContent = t('lastBackupNever'); return; }
   const d = daysSince(ts);
@@ -3427,6 +3483,7 @@ function updateProUI() {
   if (legal) legal.hidden = !(IS_NATIVE && !isPro);
   renderPlanPicker();
   syncAds();
+  updateSettingsHubStatuses();
 }
 
 async function onRestore() {
@@ -3974,6 +4031,7 @@ $('#pick-cancel').addEventListener('click', closePick);
 $('#pick-backdrop').addEventListener('click', closePick);
 dateInput.addEventListener('change', renderDateChips);
 $('#date-quick').addEventListener('click', (e) => { dateInput.value = e.currentTarget.dataset.to; renderDateChips(); });
+$('#receipt-to-pro').addEventListener('click', () => showSettingsPage('pro', 'proTitle'));
 $('#trends-row').addEventListener('click', () => { trendRange = 6; openTrends(); });
 $('#networth-row').addEventListener('click', () => { openCatModal(); showSettingsPage('accounts', 'accountsSection'); });
 
@@ -4249,7 +4307,7 @@ async function init() {
   buildFormatters();
   applyLanguage();
   updateCurrencyLabels();
-  $('#app-version').textContent = APP_VERSION;
+  renderAppVersion();
 
   // 設了 PIN 就先鎖住(內容在鎖屏後面,不可見)
   if (pinIsSet()) showLock('unlock');

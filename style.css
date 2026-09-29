@@ -920,11 +920,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .budget-field .field-input { background: none; border-radius: 0; padding-left: 0; padding-right: 0; }
 
 /* 設定:升級 Pro */
-.pro-row .row-icon { color: var(--accent); }
-.pro-row .cat-row-name { color: var(--accent); font-weight: 600; }
-.pro-row.is-pro .cat-row-name { color: var(--positive); }
-.pro-row.is-pro .row-icon { color: var(--positive); }
-.pro-row.is-pro .cat-row-chevron { display: none; }
 
 /* Pro 價值說明:同時拉開兩張卡的間距 */
 .pro-hint { margin: 10px 2px 12px; line-height: 1.6; }
@@ -1752,3 +1747,30 @@ body.has-ad .modal {
 /* Trends:進行中的月份 */
 .tt-progress { display: block; font-size: 10.5px; color: var(--text-2); font-weight: 500; margin-top: 1px; }
 .trends-note { margin: -4px 2px 14px; padding: 0; }
+
+/* ============ v1.5 設定分組 / Pro 頁 ============ */
+.settings-hub-about { margin-top: 26px; }
+.pro-hub-row .cat-row-name { font-weight: 600; color: var(--accent); }
+.build-no { font-size: 11px; color: var(--text-3); }
+
+.pro-page { padding-bottom: 24px; }
+.pro-hero { text-align: center; padding: 10px 0 18px; }
+.pro-hero-title { font-size: 26px; font-weight: 700; }
+.pro-hero-sub { margin-top: 4px; font-size: 15px; color: var(--text-2); }
+.pro-benefits { list-style: none; margin: 0 0 18px; padding: 6px 16px; background: var(--surface); border-radius: 14px; }
+.pro-benefits li { display: flex; align-items: center; gap: 12px; padding: 11px 0; font-size: 15px; }
+.pro-benefits li + li { border-top: 0.5px solid var(--separator); }
+.pb-icon { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--accent); background: var(--accent-soft); }
+.pb-icon svg { width: 19px; height: 19px; }
+.pro-cta {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; width: 100%;
+  margin-top: 12px; padding: 14px; border: none; border-radius: 13px; cursor: pointer;
+  font: inherit; font-size: 17px; font-weight: 600; color: var(--on-accent); background: var(--accent);
+}
+.pro-cta .cat-row-name { flex: none; }
+.pro-cta-status { font-size: 12px; font-weight: 500; opacity: 0.85; }
+.pro-cta-status:empty { display: none; }
+.pro-cta.is-pro { color: var(--positive); background: color-mix(in srgb, var(--positive) 12%, transparent); cursor: default; }
+.pro-cta:disabled { opacity: 0.6; }
+.receipt-quota { padding-top: 6px; }
+.settings-row-link { width: 100%; }
