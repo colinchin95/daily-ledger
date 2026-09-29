@@ -314,6 +314,13 @@ const STRINGS = {
     excludeFixed: 'Exclude fixed',
     fixedExpense: 'Fixed expense',
     fixedShort: 'Fixed',
+    paidFrom: 'Paid from',
+    receivedTo: 'Received to',
+    chooseAccount: 'Choose account',
+    moreCats: 'More',
+    allCategories: 'All categories',
+    today: 'Today',
+    yesterday: 'Yesterday',
     // Sub-categories
     subGeneral: 'General',
     newSubcategory: 'New subcategory',
@@ -1584,25 +1591,101 @@ function switchView(view) {
   if (view === 'report') renderReport();
 }
 
+// ---------- 分類圖示 ----------
+// 內建分類各有一個線條 icon;自訂分類顯示名稱首字
+const CAT_ICONS = {
+  food: '<path d="M5 11h14a7 7 0 0 1-14 0Z"/><path d="M8 7c0-1.5 1-1.5 1-3M12 7c0-1.5 1-1.5 1-3M16 7c0-1.5 1-1.5 1-3"/>',
+  transport: '<path d="M5 16V11l2-5h10l2 5v5Z"/><path d="M5 11h14"/><circle cx="8" cy="16.5" r="1.6"/><circle cx="16" cy="16.5" r="1.6"/>',
+  shopping: '<path d="M6 8h12l-1 12H7Z"/><path d="M9 8a3 3 0 0 1 6 0"/>',
+  fun: '<path d="M4 8a2 2 0 0 0 0 4v4h16v-4a2 2 0 0 0 0-4V6H4Z" transform="translate(0 1)"/><path d="M12 7v10" stroke-dasharray="2 2"/>',
+  home: '<path d="M4 11 12 4l8 7"/><path d="M6 10v10h12V10"/><path d="M10 20v-5h4v5"/>',
+  medical: '<rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8v8M8 12h8"/>',
+  other: '<circle cx="6" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="18" cy="12" r="1.3"/>',
+  salary: '<rect x="3" y="7" width="18" height="12" rx="2"/><path d="M9 7V5h6v2"/><path d="M3 12h18"/>',
+  bonus: '<rect x="4" y="10" width="16" height="10" rx="1.5"/><path d="M3 7h18v3H3zM12 7v13"/><path d="M12 7c-2-3-5-3-5-1s3 1 5 1c2 0 5 1 5-1s-3-2-5 1Z"/>',
+  investment: '<path d="M4 18 10 12l4 4 6-7"/><path d="M15 9h5v5"/>',
+  'other-income': '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>',
+};
+function catIconEl(cat) {
+  const el = document.createElement('span');
+  el.className = 'cat-icon';
+  const root = rootCat(cat);
+  const color = root?.color || 'var(--cat-none)';
+  el.style.setProperty('--cat', color);
+  const path = root && CAT_ICONS[root.id];
+  if (path) {
+    el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+  } else {
+    el.textContent = (root ? catName(root) : '?').trim().charAt(0).toUpperCase();
+  }
+  return el;
+}
+
+// ---------- 通用挑選清單(帳戶、更多分類)----------
+function openPick(title, items, onPick) {
+  $('#pick-title').textContent = title;
+  const list = $('#pick-list');
+  list.innerHTML = '';
+  for (const it of items) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pick-row' + (it.selected ? ' selected' : '');
+    b.innerHTML = `<span class="pick-name"></span><span class="pick-value num"></span><span class="pick-check">${it.selected ? '✓' : ''}</span>`;
+    if (it.lead) b.prepend(it.lead);
+    b.querySelector('.pick-name').textContent = it.name;
+    b.querySelector('.pick-value').textContent = it.value || '';
+    b.addEventListener('click', () => { closePick(); onPick(it.id); });
+    list.appendChild(b);
+  }
+  $('#pick-sheet').classList.add('open');
+  $('#pick-backdrop').classList.add('open');
+}
+function closePick() {
+  $('#pick-sheet').classList.remove('open');
+  $('#pick-backdrop').classList.remove('open');
+}
+
 // ---------- 記帳面板 ----------
+// 分類格:每列 4 個、最多 2 列;超過 8 個時最後一格是「More」
 function renderCategoryChips() {
   const cats = catMap();
   const selected = cats.get(selectedCatId);
   const selectedRoot = rootCat(selected, cats);
   categoryRowEl.innerHTML = '';
-  for (const cat of catsOfType(sheetType)) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'cat-chip' + (selectedRoot && cat.id === selectedRoot.id ? ' selected' : '');
-    chip.innerHTML = `<span class="cat-dot"></span><span></span>`;
-    chip.querySelector('.cat-dot').style.background = cat.color;
-    chip.children[1].textContent = catName(cat);
-    chip.addEventListener('click', () => {
+  const all = catsOfType(sheetType);
+  let shown = all;
+  const needMore = all.length > 8;
+  if (needMore) {
+    shown = all.slice(0, 7);
+    // 選中的若不在前 7 個,放到第 7 格,保證看得到目前選擇
+    if (selectedRoot && !shown.includes(selectedRoot) && all.includes(selectedRoot)) shown[6] = selectedRoot;
+  }
+  for (const cat of shown) {
+    const tile = document.createElement('button');
+    tile.type = 'button';
+    tile.className = 'cat-tile' + (selectedRoot && cat.id === selectedRoot.id ? ' selected' : '');
+    tile.appendChild(catIconEl(cat));
+    const nm = document.createElement('span');
+    nm.className = 'cat-tile-name';
+    nm.textContent = catName(cat);
+    tile.appendChild(nm);
+    tile.addEventListener('click', () => {
       selectedCatId = cat.id;
       renderCategoryChips();
       updateSaveState();
     });
-    categoryRowEl.appendChild(chip);
+    categoryRowEl.appendChild(tile);
+  }
+  if (needMore) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'cat-tile cat-tile-more';
+    more.innerHTML = `<span class="cat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M6 12h12M12 6v12"/></svg></span><span class="cat-tile-name"></span>`;
+    more.querySelector('.cat-tile-name').textContent = t('moreCats');
+    more.addEventListener('click', () => openPick(t('allCategories'), all.map((c) => ({
+      id: c.id, name: catName(c), lead: catIconEl(c), selected: selectedRoot && c.id === selectedRoot.id,
+    })), (id) => { selectedCatId = id; renderCategoryChips(); updateSaveState(); }));
+    categoryRowEl.appendChild(more);
   }
   renderSubcatChips(selectedRoot);
 }
@@ -1631,23 +1714,32 @@ function renderSubcatChips(root) {
   rowEl.querySelector('.selected')?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 }
 
+// 帳戶:「Paid from [logo] Touch 'n Go ▾」單行;點了開帳戶清單
 function renderAccountChips() {
-  const rowEl = $('#account-row');
-  rowEl.innerHTML = '';
-  rowEl.hidden = accounts.length < 2;   // 只有一個帳戶時不佔版面
-  for (const a of accounts) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'acct-chip' + (a.id === selectedAcctId ? ' selected' : '');
-    chip.innerHTML = `<span></span>`;
-    chip.prepend(acctBadge(a, 'xs'));
-    chip.lastElementChild.textContent = acctName(a);
-    chip.addEventListener('click', () => {
-      selectedAcctId = a.id;
-      renderAccountChips();
-    });
-    rowEl.appendChild(chip);
-  }
+  const a = accounts.find((x) => x.id === selectedAcctId) || accounts[0];
+  $('#account-picker-label').textContent = sheetType === 'income' ? t('receivedTo') : t('paidFrom');
+  const badge = $('#account-picker-badge');
+  badge.innerHTML = '';
+  if (a) badge.appendChild(acctBadge(a, 'xs'));
+  $('#account-picker-name').textContent = a ? acctName(a) : '';
+}
+function openAccountPick() {
+  openPick(t('chooseAccount'), accounts.map((a) => {
+    const bal = acctBalance(a);
+    return { id: a.id, name: acctName(a), lead: acctBadge(a, 'sm'), value: (bal < 0 ? '−' : '') + formatRM(Math.abs(bal)), selected: a.id === selectedAcctId };
+  }), (id) => { selectedAcctId = id; renderAccountChips(); });
+}
+
+// 日期:預設 Today;快捷 chip 在 Today / Yesterday 之間切換;點日期 chip 開系統選擇器
+function renderDateChips() {
+  const v = dateInput.value || todayStr();
+  const y = new Date(); y.setDate(y.getDate() - 1);
+  const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
+  $('#date-chip-label').textContent = v === todayStr() ? t('today') : v === yStr ? t('yesterday') : shortDate(v);
+  const quick = $('#date-quick');
+  const toYesterday = v === todayStr();
+  quick.textContent = toYesterday ? t('yesterday') : t('today');
+  quick.dataset.to = toYesterday ? yStr : todayStr();
 }
 
 function renderAmount() {
@@ -1662,6 +1754,7 @@ function setSheetType(type) {
   sheetType = type;
   sheetEl.dataset.type = type;
   $('#fixed-chip').hidden = type === 'income';
+  renderAccountChips();   // Paid from ↔ Received to
   setSegActive(typeSegEl, type);
   if (selectedCatId && catMap().get(selectedCatId)?.type !== type) selectedCatId = null;
   renderCategoryChips();
@@ -1680,6 +1773,7 @@ function openSheet(entry = null) {
   setFixedOn(entry ? isFixed(entry) : false);
 
   setSheetType(entry?.type ?? 'expense');
+  renderDateChips();
   renderAmount();
   sheetEl.classList.add('open');
   sheetBackdropEl.classList.add('open');
@@ -3199,7 +3293,7 @@ async function scanReceiptImage(image) {
       renderAmount();
     }
     if (r.merchant) noteInput.value = String(r.merchant).slice(0, 60);
-    if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) dateInput.value = r.date;
+    if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) { dateInput.value = r.date; renderDateChips(); }
     if (!isIn) {
       const match = findCatByAiName(r.category, 'expense');
       if (match) selectedCatId = match.id;
@@ -3856,6 +3950,11 @@ lockScreenEl.querySelector('#lock-face-btn').addEventListener('click', async () 
 $('#detail-back-btn').addEventListener('click', closeCatDetail);
 $('#trends-back-btn').addEventListener('click', closeTrends);
 $('#fixed-chip').addEventListener('click', () => setFixedOn(!fixedOn));
+$('#account-picker').addEventListener('click', openAccountPick);
+$('#pick-cancel').addEventListener('click', closePick);
+$('#pick-backdrop').addEventListener('click', closePick);
+dateInput.addEventListener('change', renderDateChips);
+$('#date-quick').addEventListener('click', (e) => { dateInput.value = e.currentTarget.dataset.to; renderDateChips(); });
 $('#trends-row').addEventListener('click', () => { trendRange = 6; openTrends(); });
 $('#networth-row').addEventListener('click', () => { openCatModal(); showSettingsPage('accounts', 'accountsSection'); });
 

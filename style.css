@@ -449,13 +449,13 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 /* 金額顯示 */
 .amount-display {
   display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
+  align-items: center;
   gap: 10px;
-  padding: 8px 6px 14px;
+  padding: 4px 4px 10px;
   border-bottom: 0.5px solid var(--separator);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
+.amount-spacer { flex: 1; }
 
 .amount-currency { font-size: 17px; color: var(--text-2); font-weight: 600; }
 
@@ -502,8 +502,9 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .cat-chip .cat-dot { width: 8px; height: 8px; }
 
 .cat-chip.selected {
-  color: var(--text);
-  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  border-color: transparent;
   background: var(--accent-soft);
 }
 
@@ -523,40 +524,21 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   padding: 5px 11px;
   font-size: 13px;
   font-family: inherit;
-  color: var(--text-3);
+  color: var(--text-2);
   background: transparent;
   border: 1px solid var(--separator);
   border-radius: 999px;
   cursor: pointer;
 }
 .sub-chip.selected {
-  color: var(--text);
-  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  border-color: transparent;
   background: var(--accent-soft);
 }
 
 /* 掃描收據 */
-.receipt-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 11px;
-  margin-bottom: 12px;
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 500;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--gold-bright) 10%, transparent);
-  border: 1px solid color-mix(in srgb, var(--gold-bright) 30%, transparent);
-  border-radius: 12px;
-  cursor: pointer;
-}
-.receipt-btn svg { width: 20px; height: 20px; }
-.receipt-btn:active { background: color-mix(in srgb, var(--gold-bright) 18%, transparent); }
-.receipt-btn:disabled { opacity: 0.6; cursor: default; }
-.receipt-btn.busy svg { animation: receipt-pulse 1s ease-in-out infinite; }
+.receipt-icon-btn.busy svg { animation: receipt-pulse 1s ease-in-out infinite; }
 
 @keyframes receipt-pulse {
   0%, 100% { opacity: 0.4; }
@@ -564,7 +546,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 }
 
 /* 備註 / 日期 */
-.field-row { display: flex; gap: 8px; margin-bottom: 12px; }
+.field-row { display: flex; gap: 8px; margin-bottom: 8px; }
 
 .field-input {
   flex: 1;
@@ -591,13 +573,13 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .keypad {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 7px;
-  margin-bottom: 12px;
+  gap: 6px;
+  margin-bottom: 10px;
 }
 
 .key {
-  padding: 14px 0;
-  font-size: 25px;
+  padding: 10px 0;
+  font-size: 24px;
   font-weight: 400;
   font-family: inherit;
   color: var(--text);
@@ -617,17 +599,16 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 /* 儲存 */
 .save-btn {
   width: 100%;
-  padding: 15px;
+  padding: 14px;
   font-size: 17px;
   font-weight: 600;
   letter-spacing: 6px;
   font-family: inherit;
-  color: var(--on-gold);
-  background: linear-gradient(170deg, var(--gold-bright) 0%, var(--accent) 55%, var(--gold-deep) 100%);
+  color: var(--on-accent);
+  background: var(--accent);
   border: none;
   border-radius: 13px;
   cursor: pointer;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
   transition: opacity 0.15s ease;
 }
 
@@ -1341,27 +1322,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .account-row::-webkit-scrollbar { display: none; }
 .account-row[hidden] { display: none; }
 
-.acct-chip {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  font-size: 13px;
-  font-family: inherit;
-  color: var(--text-2);
-  background: var(--surface-2);
-  border: 1px solid transparent;
-  border-radius: 999px;
-  cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
-}
-.acct-chip .cat-dot { width: 7px; height: 7px; }
-.acct-chip.selected {
-  color: var(--text);
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
 
 /* 明細列:帳戶小標 */
 
@@ -1574,7 +1534,6 @@ body.has-ad .modal {
 .acct-badge-lg { width: 44px; height: 44px; border-radius: 11px; font-size: 14px; }
 .acct-badge-lg.long { font-size: 12px; }
 .acct-badge-xs.long { font-size: 5.5px; }
-.acct-chip { gap: 6px; }
 
 
 /* 挑銀行 / 錢包 */
@@ -1704,3 +1663,88 @@ body.has-ad .modal {
 .icon-btn svg { width: 20px; height: 20px; }
 .icon-btn:active { opacity: 0.6; }
 .icon-btn.busy { opacity: 0.5; }
+
+/* ============ v1.5 記帳面板 ============ */
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.receipt-icon-btn {
+  flex: none; width: 42px; height: 42px; border-radius: 12px; border: none; cursor: pointer;
+  display: grid; place-items: center; background: var(--accent-soft); color: var(--accent);
+}
+.receipt-icon-btn svg { width: 22px; height: 22px; }
+.receipt-icon-btn:disabled { opacity: 0.6; }
+
+/* 分類格:4 欄、icon + 名稱 */
+.cat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+.cat-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0;
+  padding: 6px 2px 5px; border: none; border-radius: 12px; background: none; font: inherit; cursor: pointer;
+}
+.cat-tile:active { background: var(--surface-2); }
+.cat-icon {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  color: var(--cat); background: color-mix(in srgb, var(--cat) 15%, transparent);
+  font-size: 14px; font-weight: 700;
+}
+.cat-icon svg { width: 19px; height: 19px; }
+.cat-tile-name { max-width: 100%; font-size: 11.5px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cat-tile.selected { background: var(--accent-soft); }
+.cat-tile.selected .cat-tile-name { color: var(--accent); font-weight: 600; }
+.cat-tile.selected .cat-icon { color: var(--on-color); background: var(--cat); }
+.cat-tile-more .cat-icon { --cat: var(--text-2); }
+.subcat-row { margin-top: 0; padding-bottom: 8px; }
+
+/* 帳戶單行選擇器 */
+.account-picker {
+  display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 8px; padding: 8px 12px;
+  border: none; border-radius: 11px; background: var(--surface-2); font: inherit; color: var(--text); cursor: pointer; text-align: left;
+}
+.ap-label { font-size: 13px; color: var(--text-2); }
+.ap-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-chev { color: var(--text-3); font-size: 12px; }
+#account-picker-badge { display: inline-flex; }
+
+/* 日期 chips */
+.date-row { display: flex; gap: 8px; margin-bottom: 10px; }
+.date-chip {
+  position: relative; padding: 7px 14px; border: none; border-radius: 999px; font: inherit; font-size: 14px;
+  color: var(--text-2); background: var(--surface-2); cursor: pointer;
+}
+.date-chip.selected { color: var(--accent); background: var(--accent-soft); font-weight: 600; }
+.date-input-overlay { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: none; padding: 0; }
+
+/* 通用挑選清單 */
+.pick-sheet { max-height: 80dvh; display: flex; flex-direction: column; }
+.pick-list { overflow-y: auto; margin: 0 -18px; padding-bottom: 8px; }
+.pick-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 18px; border: none; background: none;
+  font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.pick-row + .pick-row { border-top: 0.5px solid var(--separator); }
+.pick-row:active { background: var(--surface-2); }
+.pick-row.selected .pick-name { color: var(--accent); font-weight: 600; }
+.pick-name { flex: 1; min-width: 0; font-size: 15px; }
+.pick-value { font-size: 14px; color: var(--text-2); }
+.pick-check { width: 16px; color: var(--accent); font-weight: 700; }
+
+/* 子分類不可被切掉:自動換行,不用橫向捲動 */
+#sheet .subcat-row { flex-wrap: wrap; overflow: visible; row-gap: 6px; }
+
+/* 一屏放得下(iPhone 15 含安全區):壓縮記帳面板的垂直間距 */
+#sheet { padding-top: 4px; }
+#sheet .grabber { margin-bottom: 4px; }
+#sheet #amount-text { font-size: 42px; min-height: 46px; line-height: 46px; }
+#sheet .amount-display { padding: 2px 4px 8px; margin-bottom: 6px; }
+#sheet .receipt-icon-btn { width: 40px; height: 40px; }
+#sheet .cat-tile { padding: 4px 2px 3px; gap: 3px; }
+#sheet .cat-icon { width: 32px; height: 32px; }
+#sheet .cat-grid { margin-bottom: 4px; }
+#sheet .subcat-row { padding-bottom: 6px; }
+#sheet .sub-chip { padding: 4px 10px; }
+#sheet .account-picker { margin-bottom: 6px; padding: 7px 12px; }
+#sheet .field-row { margin-bottom: 6px; }
+#sheet .field-input { padding: 9px 14px; }
+#sheet .date-row { margin-bottom: 8px; }
+#sheet .date-chip { padding: 6px 14px; }
+#sheet .key { padding: 7px 0; font-size: 23px; }
+#sheet .keypad { gap: 5px; margin-bottom: 8px; }
+#sheet .save-btn { padding: 13px; }
