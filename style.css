@@ -1748,3 +1748,7 @@ body.has-ad .modal {
 #sheet .key { padding: 7px 0; font-size: 23px; }
 #sheet .keypad { gap: 5px; margin-bottom: 8px; }
 #sheet .save-btn { padding: 13px; }
+
+/* Trends:進行中的月份 */
+.tt-progress { display: block; font-size: 10.5px; color: var(--text-2); font-weight: 500; margin-top: 1px; }
+.trends-note { margin: -4px 2px 14px; padding: 0; }

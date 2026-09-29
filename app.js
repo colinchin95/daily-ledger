@@ -147,6 +147,8 @@ const STRINGS = {
     trendsColMonth: 'Month',
     trendsColNet: 'Net',
     trendsEmpty: 'Add a few entries to see your trends.',
+    inProgress: 'In progress',
+    trendsNeedFullMonth: 'Averages appear after your first full month.',
     // Note filter
     frequentNotes: 'Frequent notes',
     searchSpent: (x) => `Spent ${x}`,
@@ -1383,12 +1385,16 @@ function renderTrendsPage() {
   }));
 
   // 摘要:只算有帳目的月份,不讓還沒開始用 App 的月份拉低平均
-  const avg = (key) => Math.round(active.reduce((s, mo) => s + mo[key], 0) / active.length);
+  // 進行中的當月不算:月初的半個月會把平均、最低支出、儲蓄率全部拉歪
+  const isOngoing = (mo) => mo.y === now.getFullYear() && mo.m === now.getMonth() + 1;
+  const complete = active.filter((mo) => !isOngoing(mo));
+  const nFull = complete.length;
+  const avg = (key) => (nFull ? Math.round(complete.reduce((s, mo) => s + mo[key], 0) / nFull) : null);
   const avgSpent = avg('spent');
   const avgIncome = avg('income');
-  const avgSaved = avgIncome - avgSpent;
-  const totIncome = active.reduce((s, mo) => s + mo.income, 0);
-  const totSpent = active.reduce((s, mo) => s + mo.spent, 0);
+  const avgSaved = nFull ? avgIncome - avgSpent : null;
+  const totIncome = complete.reduce((s, mo) => s + mo.income, 0);
+  const totSpent = complete.reduce((s, mo) => s + mo.spent, 0);
   const rate = totIncome > 0 ? Math.round(((totIncome - totSpent) / totIncome) * 100) : null;
   const tiles = document.createElement('div');
   tiles.className = 'trends-tiles';
@@ -1400,14 +1406,21 @@ function renderTrendsPage() {
     d.querySelector('.tt-value').textContent = value;
     tiles.appendChild(d);
   };
-  tile(t('trendsAvgSpent'), formatRM(avgSpent));
-  tile(t('trendsAvgIncome'), formatRM(avgIncome), 'income-text');
-  tile(t('trendsAvgSaved'), (avgSaved < 0 ? '−' : '') + formatRM(Math.abs(avgSaved)), avgSaved < 0 ? 'negative-text' : 'income-text');
+  tile(t('trendsAvgSpent'), nFull ? formatRM(avgSpent) : '—');
+  tile(t('trendsAvgIncome'), nFull ? formatRM(avgIncome) : '—', nFull ? 'income-text' : '');
+  tile(t('trendsAvgSaved'), nFull ? (avgSaved < 0 ? '−' : '') + formatRM(Math.abs(avgSaved)) : '—', !nFull ? '' : avgSaved < 0 ? 'negative-text' : 'income-text');
   tile(t('trendsSavingsRate'), rate === null ? '—' : `${rate}%`, rate !== null && rate < 0 ? 'negative-text' : '');
   body.appendChild(tiles);
+  if (!nFull) {
+    const note = document.createElement('p');
+    note.className = 'backup-hint trends-note';
+    note.textContent = t('trendsNeedFullMonth');
+    body.appendChild(note);
+  }
 
   // 最高 / 最低支出月份
-  const spentMonths = active.filter((mo) => mo.spent > 0);
+  // 少於 2 個完整月份就不顯示最高 / 最低
+  const spentMonths = complete.filter((mo) => mo.spent > 0);
   if (spentMonths.length >= 2) {
     const hi = spentMonths.reduce((a, b) => (b.spent > a.spent ? b : a));
     const lo = spentMonths.reduce((a, b) => (b.spent < a.spent ? b : a));
@@ -1448,6 +1461,12 @@ function renderTrendsPage() {
     row.innerHTML = `<span></span><span class="num"></span><span class="num income-text"></span><span class="num"></span>`;
     const [c0, c1, c2, c3] = row.children;
     c0.textContent = monthLong(mo);
+    if (isOngoing(mo)) {
+      const tag = document.createElement('span');
+      tag.className = 'tt-progress';
+      tag.textContent = t('inProgress');
+      c0.appendChild(tag);
+    }
     c1.textContent = formatNum(mo.spent);
     c2.textContent = formatNum(mo.income);
     c3.textContent = (net < 0 ? '−' : '') + formatNum(Math.abs(net));
