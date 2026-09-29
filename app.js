@@ -428,11 +428,11 @@ function parseMoney(str) {
   return toCents(clean);
 }
 
-// 預算使用率 → 顏色狀態
+// 預算使用率 → 顏色:平時 accent、用超過 90% 警示、超支 negative
 function budgetColor(ratio) {
-  if (ratio > 1) return 'var(--red)';
-  if (ratio >= 0.8) return '#E8A33D';
-  return 'var(--green)';
+  if (ratio > 1) return 'var(--negative)';
+  if (ratio > 0.9) return 'var(--warning)';
+  return 'var(--accent)';
 }
 
 // ---------- 日期工具(本地時區) ----------
@@ -482,10 +482,11 @@ let recurType = 'expense';
 let recurCatId = null;
 
 // 低飽和寶石色盤,與香檳/金/酒紅主題同調
+// 分類可選色:沒有純綠、純紅(綠 / 紅保留給收入與負數);前 6 色 = 預設支出分類,已過 dataviz 驗證
 const PALETTE = [
-  '#C69A4E', '#B5763C', '#A6452F', '#8E2A20', '#B4697A', '#96577E',
-  '#75618F', '#566B96', '#3E7C8A', '#4E8C7B', '#6E8B4A', '#96A050',
-  '#B79A62', '#9B7E68', '#8A8078', '#B3A99C',
+  '#CF6E1E', '#2F80D8', '#C23F7C', '#8A45C8', '#3A4C94', '#0D9488',
+  '#B8862A', '#A35A3A', '#D0689A', '#5E7FB0', '#6B5BD6', '#1F7A8C',
+  '#7E8B3A', '#9B7E68', '#8A8078', '#B3A99C',
 ];
 
 // ---------- DOM ----------
@@ -594,7 +595,7 @@ function catLabel(cat, cats = catMap()) {
   return root !== cat ? `${catName(root)} › ${catName(cat)}` : catName(cat);
 }
 // 顏色一律跟頂層分類走
-const catColor = (cat, cats = catMap()) => rootCat(cat, cats)?.color ?? '#8C95A3';
+const catColor = (cat, cats = catMap()) => rootCat(cat, cats)?.color ?? 'var(--cat-none)';
 
 // 給 AI 的分類清單(含子分類全名),以及把 AI 回傳的名稱對回分類
 function aiCategoryLabels(type = 'expense') {
@@ -672,8 +673,8 @@ function acctBadge(a, size = 'md') {
     el.appendChild(img);
     return el;
   }
-  el.style.background = inst ? inst.bg : (a?.color || '#8C95A3');
-  el.style.color = inst ? inst.fg : '#FFFFFF';
+  el.style.background = inst ? inst.bg : (a?.color || 'var(--cat-none)');
+  el.style.color = inst ? inst.fg : 'var(--on-color)';
   const txt = inst ? inst.short : (acctName(a).trim()[0] || '?').toUpperCase();
   el.textContent = txt;
   if (txt.length >= 4) el.classList.add('long');
@@ -962,7 +963,7 @@ function renderReport() {
       return {
         id: catId,
         name: catName(cat),
-        color: cat?.color ?? '#8C95A3',
+        color: cat?.color ?? 'var(--cat-none)',
         cents,
         over: budget > 0 && cents > budget,
       };
@@ -1588,7 +1589,7 @@ function renderCatDetail() {
         row.querySelector('.sub-name').textContent = subId ? catName(cats.get(subId)) : t('subGeneral');
         const bar = row.querySelector('.sub-bar');
         bar.style.width = `${((cents / total) * 100).toFixed(1)}%`;
-        bar.style.background = cat?.color ?? '#8C95A3';
+        bar.style.background = cat?.color ?? 'var(--cat-none)';
         row.querySelector('.sub-amt').textContent = formatRM(cents);
         box.appendChild(row);
       }
@@ -1897,7 +1898,7 @@ function renderAcctList() {
     const bal = acctBalance(a);
     const balEl = row.querySelector('.cat-row-count');
     balEl.textContent = formatRM(bal);
-    if (bal < 0) balEl.style.color = 'var(--red)';
+    if (bal < 0) balEl.style.color = 'var(--negative)';
     row.addEventListener('click', () => openAcctEditor(a));
     listEl2.appendChild(row);
   }
@@ -2563,6 +2564,10 @@ function sanitizeEntry(e) {
     note: typeof e.note === 'string' ? e.note.slice(0, 60) : '',
     date: DATE_RE.test(e.date) ? e.date : todayStr(),
     createdAt: Number.isFinite(e.createdAt) ? e.createdAt : Date.now(),
+    // 以下皆 optional:舊備份沒有這些欄位也照常匯入
+    ...(typeof e.accountId === 'string' && e.accountId ? { accountId: e.accountId } : {}),
+    ...(typeof e.recurringId === 'string' && e.recurringId ? { recurringId: e.recurringId } : {}),
+    ...(e.fixed === true ? { fixed: true } : {}),
   };
 }
 

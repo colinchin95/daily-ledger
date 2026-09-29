@@ -15,15 +15,23 @@ const DEFAULT_ACCOUNTS = [
   { id: 'tng',  name: "Touch 'n Go",  color: '#3E7C8A', openingCents: 0 },
 ];
 
+// 分類色(v1.5):避開純綠、純紅;Shopping / Entertainment / Medical 三色分明;Home 不是綠。
+// 已用 dataviz validate_palette.js 驗證:任兩色正常視覺 ΔE ≥ 15、相鄰色色盲 ΔE ≥ 9.7、對比 ≥ 3:1。
 const DEFAULT_EXPENSE_CATEGORIES = [
-  { id: 'food',      name: 'Food',          color: '#B5763C', type: 'expense' },
-  { id: 'transport', name: 'Transport',     color: '#566B96', type: 'expense' },
-  { id: 'shopping',  name: 'Shopping',      color: '#B4697A', type: 'expense' },
-  { id: 'fun',       name: 'Entertainment', color: '#96577E', type: 'expense' },
-  { id: 'home',      name: 'Home',          color: '#4E8C7B', type: 'expense' },
-  { id: 'medical',   name: 'Medical',       color: '#A6452F', type: 'expense' },
+  { id: 'food',      name: 'Food',          color: '#CF6E1E', type: 'expense' },
+  { id: 'transport', name: 'Transport',     color: '#2F80D8', type: 'expense' },
+  { id: 'shopping',  name: 'Shopping',      color: '#C23F7C', type: 'expense' },
+  { id: 'fun',       name: 'Entertainment', color: '#8A45C8', type: 'expense' },
+  { id: 'home',      name: 'Home',          color: '#3A4C94', type: 'expense' },
+  { id: 'medical',   name: 'Medical',       color: '#0D9488', type: 'expense' },
   { id: 'other',     name: 'Other',         color: '#8A8078', type: 'expense' },
 ];
+
+// v1.4 以前的預設色 → v1.5。只換「還是舊預設色」的,使用者自己改過的顏色不動。
+const LEGACY_DEFAULT_COLORS = {
+  food: '#B5763C', transport: '#566B96', shopping: '#B4697A',
+  fun: '#96577E', home: '#4E8C7B', medical: '#A6452F',
+};
 
 // 子分類(只有一層)。在地化:照馬來西亞人實際花錢的方式分。
 // id 固定,多台裝置各自初始化時同步合併也不會重複。
@@ -79,6 +87,14 @@ export async function getCategories() {
   if (!cats.some((c) => c.type === 'income')) {
     cats = [...cats, ...DEFAULT_INCOME_CATEGORIES];
     changed = true;
+  }
+  // 遷移(v1.5 新色盤):預設分類若還是舊預設色 → 換新色;它的子分類存的色跟著換
+  const newColor = new Map(DEFAULT_EXPENSE_CATEGORIES.map((c) => [c.id, c.color]));
+  for (const c of cats) {
+    const legacyOwn = LEGACY_DEFAULT_COLORS[c.id];
+    const legacyParent = c.parentId && LEGACY_DEFAULT_COLORS[c.parentId];
+    if (legacyOwn && c.color === legacyOwn) { c.color = newColor.get(c.id); changed = true; }
+    else if (legacyParent && c.color === legacyParent) { c.color = newColor.get(c.parentId); changed = true; }
   }
   if (changed) await set(KEY_CATEGORIES, cats);
   return cats;
