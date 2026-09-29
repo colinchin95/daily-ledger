@@ -1714,6 +1714,8 @@ body.has-ad .modal {
   font-family: -apple-system, "SF Pro Rounded", "Segoe UI", Roboto, sans-serif;
 }
 .acct-badge img { width: 100%; height: 100%; object-fit: cover; }
+/* 白底 logo(Grab、HSBC…)在米色底上要一條細框才看得出邊界 */
+.acct-badge:has(img) { box-shadow: inset 0 0 0 0.5px var(--separator), 0 0 0 0.5px var(--separator); }
 .acct-badge-xs { width: 18px; height: 18px; border-radius: 5px; font-size: 7px; }
 .acct-badge-sm { width: 28px; height: 28px; font-size: 10px; }
 .acct-badge-sm.long { font-size: 8.5px; }
