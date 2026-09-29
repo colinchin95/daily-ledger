@@ -22,6 +22,7 @@
   --cat-none: #8C95A3;        /* 找不到分類時的中性灰 */
   --knob: #FFFFFF;            /* 開關圓鈕:深淺色都是白 */
   --on-color: #FFFFFF;        /* 彩色徽章上的字 */
+  --on-accent: #FDFAF2;       /* accent 底上的字 */
   --gold-bright: #C9A227; /* 漸層頂端,維持金屬光澤(階段 5 會拿掉 Save 的漸層) */
   --gold-deep: #5A4708;
   --blur-bar: rgba(243, 236, 224, 0.82);
@@ -50,6 +51,7 @@
     --negative: #D97A6A;
     --warning: #E0A040;
     --cat-none: #8C95A3;
+    --on-accent: #1D1605;
     --gold-bright: #E8C963;
     --gold-deep: #A8862A;
     --blur-bar: rgba(23, 18, 12, 0.82);
@@ -120,15 +122,7 @@ a, a:visited { color: var(--accent); text-decoration: none; }
 
 /* 英文時收斂中文式字距 */
 body[data-lang="en"] .save-btn { letter-spacing: 1px; }
-body[data-lang="en"] .large-title { letter-spacing: 0; }
 body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
-
-.large-title {
-  margin: 0;
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: 0.4px;
-}
 
 /* ---------- 視圖 ---------- */
 .view { padding: 12px 16px 0; }
@@ -234,8 +228,8 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   align-items: center;
   justify-content: center;
   gap: 4px;
-  margin-bottom: 14px;
 }
+.month-nav[hidden] { display: none; }
 
 .month-arrow {
   background: none;
@@ -266,7 +260,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   margin-bottom: 14px;
 }
 
-.summary-card { text-align: center; padding: 22px 18px; }
+.summary-card { text-align: center; padding: 20px 18px 16px; }
 
 .summary-caption {
   font-size: 11px;
@@ -282,7 +276,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.5px;
-  margin-bottom: 12px;
 }
 
 .summary-sub {
@@ -955,7 +948,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .protect-banner, .backtap-banner { margin: 4px 16px 6px; }
 
 /* ---------- 預算 ---------- */
-.budget-card { padding: 16px 18px; }
 
 .budget-top {
   display: flex;
@@ -1135,19 +1127,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
 .search-summary { font-size: 13px; color: var(--text-2); margin: -4px 2px 12px; font-variant-numeric: tabular-nums; }
 .search-summary[hidden] { display: none; }
 
-.notes-card { padding: 16px; }
-.notes-card[hidden] { display: none; }
-.note-row {
-  display: block; width: 100%; border: none; background: none; font: inherit; color: inherit;
-  text-align: left; padding: 7px 0; cursor: pointer;
-}
-.note-row-top { display: flex; align-items: baseline; gap: 8px; font-size: 14px; }
-.note-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.note-row-n { font-size: 12px; color: var(--text-3); }
-.note-row-amt { font-weight: 600; font-variant-numeric: tabular-nums; }
-.note-row-track { display: block; height: 5px; margin-top: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
-.note-row-bar { display: block; height: 100%; border-radius: 3px; background: var(--gold-bright); }
-.note-row-bar.income { background: var(--positive); }
 
 /* ---------- 固定支出 ---------- */
 .recur-row { gap: 12px; }
@@ -1486,45 +1465,6 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   vertical-align: 1px;
 }
 
-/* ---------- 報表:帳戶餘額卡 ---------- */
-.acct-bal-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 2px;
-  border-bottom: 1px solid var(--separator);
-}
-button.acct-bal-row { width: 100%; background: none; border-left: none; border-right: none; border-top: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
-button.acct-bal-row:active { background: var(--surface-2); }
-.acct-bal-row:last-child { border-bottom: none; }
-.acct-bal-name { flex: 1; font-size: 14px; color: var(--text-2); }
-.acct-bal-amt { font-size: 15px; font-weight: 600; }
-.acct-bal-total { padding-top: 11px; }
-.acct-bal-total .acct-bal-name { font-weight: 600; color: var(--text); }
-.acct-bal-total .acct-bal-amt { font-size: 17px; }
-
-/* ---------- 報表:洞察三格 ---------- */
-.insights-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-.insights-row[hidden] { display: none; }
-.insight-tile { padding: 12px 10px; margin-bottom: 0; }
-.insight-label { font-size: 11px; color: var(--text-3); margin-bottom: 5px; letter-spacing: 0.2px; }
-.insight-value { font-size: 16px; font-weight: 650; }
-.insight-value.insight-good { color: var(--positive); }
-.insight-value.insight-bad { color: var(--negative); }
-.insight-sub {
-  margin-top: 3px;
-  font-size: 11px;
-  color: var(--text-3);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* ---------- 報表:每日長條圖 ---------- */
 .daily-chart {
   display: flex;
@@ -1695,10 +1635,6 @@ body.has-ad .modal {
 .bt-btn:active { opacity: 0.8; }
 
 /* ---------- 報表頁趨勢預覽卡 + Trends 頁 ---------- */
-.trend-preview { cursor: pointer; }
-.trend-preview:active { opacity: 0.85; }
-.trend-more { font-size: 13px; color: var(--accent); flex: none; }
-.trend-spark { margin-top: 2px; }
 .tr-endlbl { font-size: 10.5px; font-weight: 600; font-family: inherit; fill: var(--text-2); }
 #trends-body { padding-bottom: calc(env(safe-area-inset-bottom) + var(--ad-h, 0px) + 24px); }
 .trends-seg { margin-bottom: 14px; }
@@ -1740,10 +1676,6 @@ body.has-ad .modal {
 .acct-badge-xs.long { font-size: 5.5px; }
 .acct-chip { gap: 6px; }
 
-.acct-add-btn {
-  display: block; width: 100%; margin-top: 8px; padding: 10px 0 2px; border: none; background: none;
-  font: inherit; font-size: 14px; font-weight: 600; color: var(--accent); text-align: left; cursor: pointer;
-}
 
 /* 挑銀行 / 錢包 */
 .inst-picker { max-height: 88dvh; display: flex; flex-direction: column; }
@@ -1768,3 +1700,66 @@ body.has-ad .modal {
   background: var(--surface-3); color: var(--text); font: inherit; font-size: 16px; font-weight: 700;
 }
 .acct-bal-hint { padding: 0 2px 12px; margin-top: -8px; }
+
+/* ============ v1.5 報表首頁 ============ */
+/* 頁首:左留白 / 中間標題或月份 / 右齒輪 */
+.header-bar { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; }
+.page-title { margin: 0; text-align: center; font-size: 17px; font-weight: 600; }
+.page-title[hidden] { display: none; }
+.gear-btn { display: grid; place-items: center; justify-self: end; padding: 6px 0; }
+.gear-btn svg { width: 24px; height: 24px; }
+
+/* 主卡片 */
+.summary-amount-row { display: flex; justify-content: center; align-items: baseline; gap: 8px; }
+.delta-tag {
+  display: inline-block; margin-top: 6px; padding: 2px 9px; border-radius: 999px;
+  font-size: 12px; font-weight: 600; color: var(--text-2); background: var(--surface-2);
+}
+.delta-tag[hidden] { display: none; }
+.delta-tag.delta-good { color: var(--positive); background: color-mix(in srgb, var(--positive) 12%, transparent); }
+.summary-split { margin-top: 6px; font-size: 13px; color: var(--text-2); }
+.summary-split[hidden] { display: none; }
+.summary-budget { margin: 14px 0 12px; text-align: left; }
+.summary-budget .budget-bar-track { height: 8px; }
+.budget-of { margin-top: 6px; font-size: 12px; color: var(--text-2); }
+.budget-left { margin-top: 2px; font-size: 13px; color: var(--text); }
+.set-budget-btn { border: none; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--accent); cursor: pointer; padding: 4px 0; }
+.summary-budget:has(.set-budget-btn) { text-align: center; margin: 10px 0 8px; }
+.summary-sub { gap: 8px; font-size: 13px; }
+.summary-dot { color: var(--text-3); }
+
+/* 分類區塊:標題 + 小切換 */
+.section-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 0 4px; }
+.section-title { font-size: 15px; font-weight: 600; }
+.seg.seg-mini { width: auto; margin: 0; padding: 2px; border-radius: 8px; }
+.seg.seg-mini .seg-btn { padding: 4px 12px; font-size: 12px; border-radius: 6px; flex: none; }
+.fixed-toggle-row[hidden] { display: none; }
+
+/* 入口列 */
+.link-card { padding: 2px 16px; }
+.link-row {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 14px 0;
+  border: none; background: none; font: inherit; color: var(--text); text-align: left; cursor: pointer;
+}
+.link-row + .link-row { border-top: 0.5px solid var(--separator); }
+.link-row:active { opacity: 0.6; }
+.link-row-name { flex: 1; font-size: 15px; }
+.link-row-value { font-size: 15px; font-weight: 600; }
+.link-row-chev { color: var(--text-3); font-size: 18px; }
+
+/* 精簡單行引導 banner */
+.mini-banner {
+  display: flex; align-items: center; gap: 10px; margin: 2px 16px 8px; padding: 8px 8px 8px 12px;
+  border-radius: 12px; background: var(--accent-soft); font-size: 13px; color: var(--text);
+}
+.mini-banner[hidden] { display: none; }
+.mini-banner svg { width: 18px; height: 18px; flex: none; color: var(--accent); }
+.mini-banner-text { flex: 1; min-width: 0; line-height: 1.35; }
+.mini-banner-cta { flex: none; border: none; border-radius: 8px; padding: 6px 12px; font: inherit; font-size: 13px; font-weight: 600; color: var(--on-accent); background: var(--accent); cursor: pointer; }
+.mini-banner-x { flex: none; border: none; background: none; font-size: 13px; color: var(--text-3); padding: 6px; cursor: pointer; }
+
+/* 分類明細:最大一筆 */
+.detail-biggest { display: flex; align-items: baseline; gap: 8px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--surface); text-align: left; font-size: 13px; }
+.db-label { flex: none; color: var(--text-2); }
+.db-note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-amt { flex: none; font-weight: 600; }

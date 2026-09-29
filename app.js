@@ -41,7 +41,7 @@ const STRINGS = {
     today: 'Today',
     yesterday: 'Yesterday',
     monthSpending: 'Spent this month',
-    balance: 'Balance',
+    net: 'Net',
     noExpense: 'No expenses this month',
     noIncome: 'No income this month',
     settings: 'Settings',
@@ -281,6 +281,17 @@ const STRINGS = {
     openingBalance: 'Opening balance (optional)',
     netWorth: 'Net worth',
     accountsTitle: 'Account balances',
+    trendsRow: '6-month trends',
+    ofBudget: (b) => `of ${b} budget`,
+    budgetLeftLine: (left) => `${left} left`,
+    budgetDaysLine: (d, perDay) => `${d === 1 ? '1 day' : `${d} days`} to go · ~${perDay}/day`,
+    budgetOverLine: (x) => `${x} over budget`,
+    setBudget: 'Set a budget',
+    deltaVsSamePeriod: (p) => `${p} vs same period`,
+    deltaVsLastMonth: (p) => `${p} vs last month`,
+    biggestExpense: 'Biggest expense',
+    backtapBannerShort: 'Log any payment with a double-tap on the back of your iPhone.',
+    backtapSetupShort: 'Set up',
     addAccount: 'Add account',
     pickInstitution: 'Add account',
     instSearch: 'Search bank or e-wallet',
@@ -389,6 +400,11 @@ export function formatRM(cents) {
     .map((p) => (p.type === 'currency' ? p.value + ' ' : p.value))
     .join('')
     .replace(/\s+/g, ' ');
+}
+
+// 整數金額省略「.00」(預算、每日可花這類概數用):RM 3,500 / RM 559
+function formatRMRound(cents) {
+  return formatRM(Math.round(cents / 100) * 100).replace(/[.,]00$/, '');
 }
 
 // 純數字字串(無幣別符號)
@@ -541,8 +557,6 @@ const backupBannerEl = $('#backup-banner');
 const backupStatusEl = $('#backup-status');
 
 // 報表:預算卡 + 趨勢卡
-const budgetCardEl = $('#budget-card');
-const trendCardEl = $('#trend-card');
 
 // 分類編輯器:預算欄
 const catBudgetField = $('#cat-budget-field');
@@ -929,20 +943,18 @@ function renderReport() {
   const monthEntries = entries.filter((e) => e.date.startsWith(key));
   const expense = monthEntries.filter((e) => e.type !== 'income').reduce((s, e) => s + e.amountCents, 0);
   const income = monthEntries.filter((e) => e.type === 'income').reduce((s, e) => s + e.amountCents, 0);
-  const balance = income - expense;
+  // 「Net」= 本月收入 − 支出(不叫 Balance,避免和帳戶餘額混淆)
+  const net = income - expense;
 
   reportExpenseEl.textContent = formatRM(expense);
   reportIncomeEl.textContent = formatRM(income);
-  reportBalanceEl.textContent = formatRM(balance);
-  reportBalanceEl.classList.toggle('income-text', balance >= 0);
-  reportBalanceEl.classList.toggle('negative-text', balance < 0);
+  reportBalanceEl.textContent = (net < 0 ? '−' : '') + formatRM(Math.abs(net));
+  reportBalanceEl.classList.toggle('negative-text', net < 0);
 
-  renderBudgetCard(expense);
-  renderAccountsCard();
-  renderInsights(key, monthEntries);
+  renderDeltaTag(key, expense);
+  renderBudgetLine(expense);
   renderDaily(key, monthEntries);
-  renderTrend();
-  renderTopNotes(monthEntries);
+  renderReportLinks();
 
   // 各分類佔比
   const cats = catMap();
@@ -1011,142 +1023,85 @@ function renderReport() {
   }
 }
 
-// ---------- 整月預算卡 ----------
-function renderBudgetCard(monthExpense) {
-  const budget = meta.monthlyBudgetCents ?? 0;
-  if (budget <= 0) {
-    budgetCardEl.hidden = true;
-    return;
-  }
-  budgetCardEl.hidden = false;
-  const ratio = monthExpense / budget;
-  const remaining = budget - monthExpense;
-  const color = budgetColor(ratio);
-
-  budgetCardEl.innerHTML = `
-    <div class="budget-top">
-      <span class="budget-label"></span>
-      <span class="budget-vs num"></span>
-    </div>
-    <div class="budget-bar-track"><div class="budget-bar"></div></div>
-    <div class="budget-foot num"></div>`;
-  budgetCardEl.querySelector('.budget-label').textContent = t('monthlyBudget');
-  budgetCardEl.querySelector('.budget-vs').textContent = t('budgetVs', formatRM(monthExpense), formatRM(budget));
-  const bar = budgetCardEl.querySelector('.budget-bar');
-  bar.style.width = `${Math.min(100, ratio * 100).toFixed(1)}%`;
-  bar.style.background = color;
-  const foot = budgetCardEl.querySelector('.budget-foot');
-  foot.textContent = remaining >= 0 ? t('budgetLeft', formatRM(remaining)) : t('budgetOver', formatRM(-remaining));
-  foot.style.color = color;
-}
-
-// ---------- 帳戶餘額卡 ----------
-function renderAccountsCard() {
-  const card = $('#accounts-card');
-  card.innerHTML = '';
-  const title = document.createElement('div');
-  title.className = 'trend-title';
-  title.textContent = t('accountsTitle');
-  card.appendChild(title);
-
-  let total = 0;
-  for (const a of accounts) {
-    const bal = acctBalance(a);
-    total += bal;
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'acct-bal-row';
-    row.innerHTML = `<span class="acct-bal-name"></span><span class="acct-bal-amt num"></span>`;
-    row.prepend(acctBadge(a, 'sm'));
-    row.querySelector('.acct-bal-name').textContent = acctName(a);
-    row.addEventListener('click', () => openAcctEditor(a));
-    const amt = row.querySelector('.acct-bal-amt');
-    amt.textContent = formatRM(bal);
-    if (bal < 0) amt.classList.add('negative-text');
-    card.appendChild(row);
-  }
-  const totalRow = document.createElement('div');
-  totalRow.className = 'acct-bal-row acct-bal-total';
-  totalRow.innerHTML = `<span class="acct-bal-name"></span><span class="acct-bal-amt num"></span>`;
-  totalRow.querySelector('.acct-bal-name').textContent = t('netWorth');
-  const totalAmt = totalRow.querySelector('.acct-bal-amt');
-  totalAmt.textContent = formatRM(total);
-  totalAmt.classList.toggle('negative-text', total < 0);
-  card.appendChild(totalRow);
-  const add = document.createElement('button');
-  add.type = 'button';
-  add.className = 'acct-add-btn';
-  add.textContent = `＋ ${t('addAccount')}`;
-  add.addEventListener('click', openInstPicker);
-  card.appendChild(add);
-}
-
-// ---------- 本月洞察(日均 / 較上月 / 最大單筆) ----------
-function renderInsights(key, monthEntries) {
-  const card = $('#insights-card');
-  card.innerHTML = '';
-  const isIncome = reportType === 'income';
-  const typed = monthEntries.filter((e) => (e.type === 'income') === isIncome);
-  const total = typed.reduce((s, e) => s + e.amountCents, 0);
-  if (!typed.length) { card.hidden = true; return; }
-  card.hidden = false;
-
+// ---------- 主卡片:較同期標籤 ----------
+function renderDeltaTag(key, total) {
+  const el = $('#report-delta');
   const isCurrent = reportMonth.y === now.getFullYear() && reportMonth.m === now.getMonth() + 1;
   const daysInMonth = new Date(reportMonth.y, reportMonth.m, 0).getDate();
   const elapsed = isCurrent ? now.getDate() : daysInMonth;
-
-  // 較上月(當月比同期,過去月份比整月)
   let pm = reportMonth.m - 1, py = reportMonth.y;
   if (pm <= 0) { pm = 12; py -= 1; }
   const pKey = `${py}-${String(pm).padStart(2, '0')}`;
-  const prevDaysInMonth = new Date(py, pm, 0).getDate();
-  const cutoff = isCurrent ? Math.min(elapsed, prevDaysInMonth) : prevDaysInMonth;
-  const prevTotal = entries
-    .filter((e) => (e.type === 'income') === isIncome && e.date.startsWith(pKey)
-      && Number(e.date.slice(8, 10)) <= cutoff)
+  // 當月比「上月同一天為止」,過去月份比整月
+  const cutoff = isCurrent ? Math.min(elapsed, new Date(py, pm, 0).getDate()) : 31;
+  const prev = entries
+    .filter((e) => e.type !== 'income' && e.date.startsWith(pKey) && Number(e.date.slice(8, 10)) <= cutoff)
     .reduce((s, e) => s + e.amountCents, 0);
+  if (!prev || !total) { el.hidden = true; return; }
+  const pct = Math.round(((total - prev) / prev) * 100);
+  const txt = (pct > 0 ? '+' : pct < 0 ? '−' : '') + Math.abs(pct) + '%';
+  el.textContent = isCurrent ? t('deltaVsSamePeriod', txt) : t('deltaVsLastMonth', txt);
+  // 花得比較少 = 正向變化(positive);花得比較多只是中性資訊,不用紅色
+  el.classList.toggle('delta-good', pct < 0);
+  el.hidden = false;
+}
 
-  let deltaTxt = '—', deltaCls = '';
-  if (prevTotal > 0) {
-    const pct = ((total - prevTotal) / prevTotal) * 100;
-    deltaTxt = (pct >= 0 ? '+' : '') + pct.toFixed(0) + '%';
-    // 支出漲=紅,收入漲=綠
-    deltaCls = (pct >= 0) === isIncome ? 'good' : 'bad';
-    if (Math.abs(pct) < 0.5) deltaCls = '';
+// ---------- 主卡片:預算進度 ----------
+function renderBudgetLine(expense) {
+  const el = $('#report-budget');
+  el.innerHTML = '';
+  const budget = meta.monthlyBudgetCents ?? 0;
+  if (budget <= 0) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'set-budget-btn';
+    b.textContent = `${t('setBudget')} ›`;
+    b.addEventListener('click', () => { openCatModal(); showSettingsPage('budget', 'budgetRecurringTitle'); });
+    el.appendChild(b);
+    return;
   }
-
-  const top = typed.reduce((a, b) => (b.amountCents > a.amountCents ? b : a));
-  const cats = catMap();
-  const topLabel = top.note || catLabel(cats.get(top.categoryId), cats);
-
-  const tiles = [
-    { label: isIncome ? t('avgPerDayIncome') : t('avgPerDay'), value: formatRM(Math.round(total / Math.max(1, elapsed))) },
-    { label: isCurrent ? t('vsSamePeriod') : t('vsLastMonth'), value: deltaTxt, cls: deltaCls },
-    { label: t('topSpend'), value: formatRM(top.amountCents), sub: topLabel },
-  ];
-  for (const tile of tiles) {
-    const el = document.createElement('div');
-    el.className = 'insight-tile card';
-    el.innerHTML = `<div class="insight-label"></div><div class="insight-value num"></div><div class="insight-sub" hidden></div>`;
-    el.querySelector('.insight-label').textContent = tile.label;
-    const v = el.querySelector('.insight-value');
-    v.textContent = tile.value;
-    if (tile.cls) v.classList.add('insight-' + tile.cls);
-    if (tile.sub) {
-      const s = el.querySelector('.insight-sub');
-      s.textContent = tile.sub;
-      s.hidden = false;
-    }
-    card.appendChild(el);
+  const ratio = expense / budget;
+  const remaining = budget - expense;
+  const color = budgetColor(ratio);
+  el.innerHTML = `
+    <div class="budget-bar-track"><div class="budget-bar"></div></div>
+    <div class="budget-of"></div>
+    <div class="budget-left num"></div>`;
+  const bar = el.querySelector('.budget-bar');
+  bar.style.width = `${Math.min(100, ratio * 100).toFixed(1)}%`;
+  bar.style.background = color;
+  el.querySelector('.budget-of').textContent = t('ofBudget', formatRMRound(budget));
+  const left = el.querySelector('.budget-left');
+  if (remaining < 0) {
+    left.textContent = t('budgetOverLine', formatRM(-remaining));
+    left.classList.add('negative-text');
+    return;
   }
+  let line = t('budgetLeftLine', formatRM(remaining));
+  // 剩餘天數 / 每日可花:只在看當月時顯示;剩餘天數含今天
+  const isCurrent = reportMonth.y === now.getFullYear() && reportMonth.m === now.getMonth() + 1;
+  if (isCurrent) {
+    const daysLeft = new Date(reportMonth.y, reportMonth.m, 0).getDate() - now.getDate() + 1;
+    line += ' · ' + t('budgetDaysLine', daysLeft, formatRMRound(Math.floor(remaining / daysLeft / 100) * 100));
+  }
+  left.textContent = line;
+  if (ratio > 0.9) left.style.color = color;
+}
+
+// ---------- 入口列:淨資產 / 趨勢 ----------
+function renderReportLinks() {
+  // 淨資產 = 所有帳戶目前餘額,不受月份切換影響
+  const total = accounts.reduce((s, a) => s + acctBalance(a), 0);
+  const el = $('#networth-amt');
+  el.textContent = (total < 0 ? '−' : '') + formatRM(Math.abs(total));
+  el.classList.toggle('negative-text', total < 0);
 }
 
 // ---------- 每日長條圖 ----------
 function renderDaily(key, monthEntries) {
   const card = $('#daily-card');
   card.innerHTML = '';
-  const isIncome = reportType === 'income';
-  const typed = monthEntries.filter((e) => (e.type === 'income') === isIncome);
+  const typed = monthEntries.filter((e) => e.type !== 'income');
   if (!typed.length) { card.hidden = true; return; }
   card.hidden = false;
 
@@ -1162,7 +1117,7 @@ function renderDaily(key, monthEntries) {
 
   const title = document.createElement('div');
   title.className = 'trend-title';
-  title.textContent = isIncome ? t('dailyTitleIncome') : t('dailyTitle');
+  title.textContent = t('dailyTitle');
   card.appendChild(title);
 
   const chart = document.createElement('div');
@@ -1324,25 +1279,6 @@ function trendLegend(mo) {
   return legend;
 }
 
-// ---------- 報表頁:趨勢預覽卡(點進去是完整的 Trends 頁) ----------
-function renderTrend() {
-  const months = trendMonths(6);
-  const cur = months[months.length - 1];
-  trendCardEl.innerHTML = '';
-  trendCardEl.classList.add('trend-preview');
-  const head = document.createElement('div');
-  head.className = 'trend-head';
-  head.innerHTML = `<span class="trend-title"></span><span class="trend-more"></span>`;
-  head.querySelector('.trend-title').textContent = t('trendBoth');
-  head.querySelector('.trend-more').textContent = `${t('trendsViewAll')} ›`;
-  trendCardEl.appendChild(head);
-  trendCardEl.appendChild(trendLegend(cur));
-  const box = document.createElement('div');
-  box.className = 'trend-spark';
-  trendCardEl.appendChild(box);
-  box.appendChild(drawTrendChart(box, months, { height: 64, compact: true }));
-}
-
 // ---------- Trends 頁 ----------
 let trendRange = 6;       // 6 / 12 / 'all'
 let trendSel = -1;        // 選中的月份索引(-1 = 最後一個月)
@@ -1478,45 +1414,6 @@ function renderTrendsPage() {
   body.appendChild(table);
 }
 
-// ---------- 本月常見備註(點了回明細,用備註篩選) ----------
-function renderTopNotes(monthEntries) {
-  const card = $('#notes-card');
-  const isIncome = reportType === 'income';
-  const groups = groupByNote(monthEntries.filter((e) => (e.type === 'income') === isIncome))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 5);
-  card.innerHTML = '';
-  card.hidden = !groups.length;
-  if (!groups.length) return;
-  const title = document.createElement('div');
-  title.className = 'trend-title';
-  title.textContent = isIncome ? t('topNotesIncome') : t('topNotes');
-  card.appendChild(title);
-  const max = groups[0].total || 1;
-  for (const g of groups) {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'note-row';
-    row.innerHTML = `
-      <span class="note-row-top"><span class="note-row-name"></span><span class="note-row-n num"></span><span class="note-row-amt num"></span></span>
-      <span class="note-row-track"><span class="note-row-bar"></span></span>`;
-    row.querySelector('.note-row-name').textContent = g.label;
-    row.querySelector('.note-row-n').textContent = t('noteTimes', g.count);
-    const amt = row.querySelector('.note-row-amt');
-    amt.textContent = (isIncome ? '+' : '') + formatRM(g.total);
-    amt.classList.toggle('income-text', isIncome);
-    const bar = row.querySelector('.note-row-bar');
-    bar.style.width = `${Math.max(2, (g.total / max) * 100).toFixed(1)}%`;
-    bar.classList.toggle('income', isIncome);
-    row.addEventListener('click', () => {
-      switchView('list');
-      setNoteFilter(g.label);
-      window.scrollTo({ top: 0 });
-    });
-    card.appendChild(row);
-  }
-}
-
 // ---------- 分類明細(點報表分類進入) ----------
 function renderCatDetail() {
   if (detailCatId === null) return;
@@ -1539,6 +1436,18 @@ function renderCatDetail() {
   totalEl.classList.toggle('income-text', isIncome);
   detailSummaryEl.querySelector('.detail-sub').textContent =
     `${monthFmt.format(new Date(reportMonth.y, reportMonth.m - 1, 1))} · ${t('entryCount', rows.length)}`;
+
+  // 本分類本月最大一筆(從報表首頁的數據卡移過來)
+  if (!isIncome && rows.length) {
+    const top = rows.reduce((x, y) => (y.amountCents > x.amountCents ? y : x));
+    const big = document.createElement('div');
+    big.className = 'detail-biggest';
+    big.innerHTML = `<span class="db-label"></span><span class="db-note"></span><span class="db-amt num"></span>`;
+    big.querySelector('.db-label').textContent = t('biggestExpense');
+    big.querySelector('.db-note').textContent = `${top.note || catLabel(cats.get(top.categoryId), cats)} · ${shortDate(top.date)}`;
+    big.querySelector('.db-amt').textContent = formatRM(top.amountCents);
+    detailSummaryEl.appendChild(big);
+  }
 
   // 分類預算進度(僅支出且有設定預算)
   const budget = !isIncome ? (cat?.budgetCents ?? 0) : 0;
@@ -1648,6 +1557,8 @@ function closeCatDetail() {
 function switchView(view) {
   viewListEl.hidden = view !== 'list';
   viewReportEl.hidden = view !== 'report';
+  $('#hdr-title').hidden = view !== 'list';
+  $('#hdr-month').hidden = view !== 'report';
   tabListBtn.classList.toggle('active', view === 'list');
   tabReportBtn.classList.toggle('active', view === 'report');
   if (view === 'report') renderReport();
@@ -3817,7 +3728,7 @@ $('#import-btn').addEventListener('click', () => $('#import-file').click());
 $('#backup-banner-now').addEventListener('click', exportBackup);
 $('#backup-banner-later').addEventListener('click', snoozeBackupBanner);
 $('#backtap-later').addEventListener('click', () => {
-  lsSet('backtapSnoozeUntil', String(Date.now() + 7 * DAY_MS));
+  lsSet(BACKTAP_DISMISSED_KEY, '1');   // 永久關閉,不再出現
   maybeShowBacktapBanner();
 });
 $('#backtap-setup').addEventListener('click', openQuickAddSettings);
@@ -3925,7 +3836,8 @@ lockScreenEl.querySelector('#lock-face-btn').addEventListener('click', async () 
 
 $('#detail-back-btn').addEventListener('click', closeCatDetail);
 $('#trends-back-btn').addEventListener('click', closeTrends);
-trendCardEl.addEventListener('click', openTrends);
+$('#trends-row').addEventListener('click', () => { trendRange = 6; openTrends(); });
+$('#networth-row').addEventListener('click', () => { openCatModal(); showSettingsPage('accounts', 'accountsSection'); });
 
 $('#cat-editor-cancel').addEventListener('click', closeCatEditor);
 catEditorBackdropEl.addEventListener('click', closeCatEditor);
@@ -4014,6 +3926,7 @@ const raScan = async (b64) => {
 // 空字串時退回手動教學 + 打開捷徑 App。
 const BACKTAP_SHORTCUT_URL = 'https://www.icloud.com/shortcuts/021e402d801642c8b9e0896888665f75';
 const BACKTAP_DONE_KEY = 'ra-backtap-done';
+const BACKTAP_DISMISSED_KEY = 'ra-backtap-dismissed';
 const BACKTAP_STEP1_KEY = 'ra-backtap-step1';
 const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch {} };
@@ -4033,9 +3946,10 @@ function openQuickAddSettings() {
 function maybeShowBacktapBanner() {
   const el = $('#backtap-banner');
   if (!el) return;
-  const snoozed = Date.now() < (Number(lsGet('backtapSnoozeUntil')) || 0);
-  el.hidden = !isIOSNative() || lsGet(BACKTAP_DONE_KEY) === '1' || snoozed;
-  if (!el.hidden) el.querySelector('.backtap-text').textContent = t('backtapBanner');
+  // 設定完成或按過 ✕ 就永久隱藏(舊版的「稍後」暫緩也算已關閉)
+  const dismissed = lsGet(BACKTAP_DISMISSED_KEY) === '1' || !!lsGet('backtapSnoozeUntil');
+  el.hidden = !isIOSNative() || lsGet(BACKTAP_DONE_KEY) === '1' || dismissed;
+  if (!el.hidden) el.querySelector('.backtap-text').textContent = t('backtapBannerShort');
 }
 
 function renderBacktapSetup(page) {

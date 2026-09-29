@@ -16,11 +16,18 @@
 </head>
 <body>
   <header class="app-header">
-    <div class="nav-bar">
+    <div class="nav-bar header-bar">
       <span class="nav-spacer"></span>
-      <button id="cat-manage-btn" class="nav-btn" type="button" data-i18n="settings">Settings</button>
+      <h1 id="hdr-title" class="page-title" data-i18n="entries">Entries</h1>
+      <div id="hdr-month" class="month-nav" hidden>
+        <button id="month-prev" class="month-arrow" type="button" aria-label="Previous month">‹</button>
+        <span id="month-label" class="month-label"></span>
+        <button id="month-next" class="month-arrow" type="button" aria-label="Next month">›</button>
+      </div>
+      <button id="cat-manage-btn" class="nav-btn gear-btn" type="button" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4Z" stroke="currentColor" stroke-width="1.7"/><path d="M19.4 13.5a7.7 7.7 0 0 0 0-3l2-1.6-2-3.4-2.4.9a7.6 7.6 0 0 0-2.6-1.5L14 2.4h-4l-.4 2.5A7.6 7.6 0 0 0 7 6.4l-2.4-.9-2 3.4 2 1.6a7.7 7.7 0 0 0 0 3l-2 1.6 2 3.4 2.4-.9a7.6 7.6 0 0 0 2.6 1.5l.4 2.5h4l.4-2.5a7.6 7.6 0 0 0 2.6-1.5l2.4.9 2-3.4-2-1.6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      </button>
     </div>
-    <h1 class="large-title" data-i18n="appTitle">RichAuntie</h1>
   </header>
 
   <!-- 資料保護提示:有資料但未開同步時提醒 -->
@@ -35,15 +42,11 @@
     </div>
   </div>
 
-  <div id="backtap-banner" class="backup-banner backtap-banner" hidden>
-    <div class="backup-banner-row">
-      <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="2.5" width="10" height="19" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 9.5c.8-.8 2.2-.8 3 0M9.2 7.8c1.6-1.5 4-1.5 5.6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <span class="backup-banner-text backtap-text"></span>
-    </div>
-    <div class="backup-banner-actions">
-      <button id="backtap-later" class="backup-banner-btn backup-banner-later" type="button" data-i18n="later">Later</button>
-      <button id="backtap-setup" class="backup-banner-btn backup-banner-now" type="button" data-i18n="backtapSetup">Set up · 30s</button>
-    </div>
+  <div id="backtap-banner" class="mini-banner" hidden>
+    <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="2.5" width="10" height="19" rx="2.5" stroke="currentColor" stroke-width="1.7"/><path d="M10.5 9.5c.8-.8 2.2-.8 3 0M9.2 7.8c1.6-1.5 4-1.5 5.6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+    <span class="mini-banner-text backtap-text"></span>
+    <button id="backtap-setup" class="mini-banner-cta" type="button" data-i18n="backtapSetupShort">Set up</button>
+    <button id="backtap-later" class="mini-banner-x" type="button" aria-label="Dismiss">✕</button>
   </div>
 
   <!-- 明細 -->
@@ -98,40 +101,51 @@
 
   <!-- 報表 -->
   <main id="view-report" class="view" hidden>
-    <div class="month-nav">
-      <button id="month-prev" class="month-arrow" type="button" aria-label="prev">‹</button>
-      <span id="month-label" class="month-label"></span>
-      <button id="month-next" class="month-arrow" type="button" aria-label="next">›</button>
-    </div>
-
+    <!-- 1. 頁首月份切換在 app-header;2. 主卡片:本月支出 + 預算 + 收入/淨額 -->
     <section class="card summary-card">
       <div class="summary-caption" data-i18n="monthSpending">Spent this month</div>
-      <div id="report-expense" class="summary-amount">RM 0.00</div>
+      <div class="summary-amount-row">
+        <div id="report-expense" class="summary-amount">RM 0.00</div>
+      </div>
+      <div id="report-delta" class="delta-tag" hidden></div>
+      <div id="report-split" class="summary-split num" hidden></div>
+      <div id="report-budget" class="summary-budget"></div>
       <div class="summary-sub">
-        <span><span data-i18n="income">Income</span> <span id="report-income" class="num income-text">RM 0.00</span></span>
-        <span class="summary-divider"></span>
-        <span><span data-i18n="balance">Balance</span> <span id="report-balance" class="num">RM 0.00</span></span>
+        <span><span data-i18n="income">Income</span> <span id="report-income" class="num">RM 0.00</span></span>
+        <span class="summary-dot">·</span>
+        <span><span data-i18n="net">Net</span> <span id="report-balance" class="num">RM 0.00</span></span>
       </div>
     </section>
 
-    <section id="accounts-card" class="card accounts-card"></section>
+    <!-- 3. 分類 -->
+    <section class="card breakdown-card">
+      <div class="section-head">
+        <span class="section-title" data-i18n="categoriesSection">Categories</span>
+        <div class="seg seg-mini" id="report-seg">
+          <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">Expense</button>
+          <button class="seg-btn" data-type="income" type="button" data-i18n="income">Income</button>
+        </div>
+      </div>
+      <div id="report-fixed-toggle" class="fixed-toggle-row" hidden></div>
+      <div id="report-breakdown"></div>
+    </section>
 
-    <section id="budget-card" class="card budget-card" hidden></section>
-
-    <div class="seg" id="report-seg">
-      <button class="seg-btn active" data-type="expense" type="button" data-i18n="expense">Expense</button>
-      <button class="seg-btn" data-type="income" type="button" data-i18n="income">Income</button>
-    </div>
-
-    <section id="insights-card" class="insights-row"></section>
-
+    <!-- 4. 每日支出 -->
     <section id="daily-card" class="card daily-card"></section>
 
-    <section id="trend-card" class="card trend-card"></section>
-
-    <section id="report-breakdown" class="card breakdown-card"></section>
-
-    <section id="notes-card" class="card notes-card" hidden></section>
+    <!-- 5. 入口列 -->
+    <section class="card link-card">
+      <button id="networth-row" class="link-row" type="button">
+        <span class="link-row-name" data-i18n="netWorth">Net worth</span>
+        <span id="networth-amt" class="link-row-value num"></span>
+        <span class="link-row-chev">›</span>
+      </button>
+      <button id="trends-row" class="link-row" type="button">
+        <span class="link-row-name" data-i18n="trendsRow">6-month trends</span>
+        <span class="link-row-value"></span>
+        <span class="link-row-chev">›</span>
+      </button>
+    </section>
   </main>
 
   <!-- 底部 Tab Bar -->
