@@ -1774,3 +1774,45 @@ body.has-ad .modal {
 .pro-cta:disabled { opacity: 0.6; }
 .receipt-quota { padding-top: 6px; }
 .settings-row-link { width: 100%; }
+
+/* ---------- Pro 3D 分類圖示 ---------- */
+.cat-icon-img { background: none !important; }
+.cat-icon-img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.cat-tile.selected .cat-icon-img { background: none !important; box-shadow: 0 0 0 2px var(--accent); }
+.cat-row .cat-icon { width: 28px; height: 28px; }
+
+.icon-field {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 10px 0 4px;
+  padding: 10px 14px; border: none; border-radius: 12px; background: var(--surface-2);
+  font: inherit; color: var(--text); cursor: pointer; text-align: left;
+}
+.icon-field[hidden] { display: none; }
+.if-label { flex: 1; font-size: 15px; }
+.if-preview { display: flex; }
+.if-preview img { width: 30px; height: 30px; object-fit: contain; }
+.if-value { font-size: 14px; color: var(--text-3); }
+.if-chev { color: var(--text-3); font-size: 17px; }
+
+.icon-backdrop { z-index: 34; }
+.icon-sheet { z-index: 35; max-height: 82vh; display: flex; flex-direction: column; }
+.icon-grid-wrap { overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 8px; }
+.icon-pro-note {
+  margin: 4px 0 8px; padding: 10px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4;
+  color: var(--accent); background: var(--accent-soft);
+}
+.icon-pro-note[hidden] { display: none; }
+.icon-group-label { margin: 14px 0 6px; }
+.icon-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.icon-cell {
+  position: relative; aspect-ratio: 1; padding: 4px; border: none; border-radius: 12px;
+  background: var(--surface-2); cursor: pointer; display: grid; place-items: center;
+}
+.icon-cell img { width: 100%; height: 100%; object-fit: contain; }
+.icon-cell.selected { box-shadow: 0 0 0 2px var(--accent); background: var(--accent-soft); }
+.icon-cell.locked img { opacity: 0.55; }
+.icon-lock { position: absolute; top: 1px; right: 2px; font-size: 11px; line-height: 1; }
+.icon-cell-default {
+  width: 100%; aspect-ratio: auto; margin-top: 4px; padding: 10px; font: inherit; font-size: 14px; color: var(--text);
+}
+.pb-icon-img { background: none; }
+.pb-icon-img img { width: 34px; height: 34px; object-fit: contain; }

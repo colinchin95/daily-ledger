@@ -201,6 +201,15 @@ const STRINGS = {
     proBenefit1: 'Unlimited receipt & screenshot scanning',
     proBenefit2: 'Bank & credit card statement import',
     proBenefit3: 'No ads',
+    proBenefit4: '60+ Malaysian 3D category icons',
+    iconLabel: 'Icon',
+    iconDefault: 'Default',
+    chooseIcon: 'Choose icon',
+    iconProNote: 'The 3D icon pack is part of RichAuntie Pro. Tap any icon to see Pro.',
+    iconGroupFood: 'Food & drink',
+    iconGroupTransport: 'Transport & home',
+    iconGroupLife: 'Life & shopping',
+    iconGroupMoney: 'Money & festive',
     receiptIntro: 'Snap a receipt or a payment screenshot and AI fills in the amount, merchant, date and category for you.',
     receiptQuotaFree: 'Free plan: 5 scans a month. Pro makes scanning unlimited.',
     receiptQuotaPro: 'You have Pro — scanning is unlimited.',
@@ -1649,12 +1658,39 @@ const CAT_ICONS = {
   investment: '<path d="M4 18 10 12l4 4 6-7"/><path d="M15 9h5v5"/>',
   'other-income': '<circle cx="12" cy="12" r="8"/><path d="M12 8v8M8 12h8"/>',
 };
+// Pro 3D 圖示包(icons/cat3d/*.webp,128px)。分類存 icon: '3d:<id>'
+const ICON_PACK = [
+  ['iconGroupFood', ['nasi-lemak', 'teh-tarik', 'roti-canai', 'durian', 'satay', 'char-kuey-teow', 'bubble-tea', 'kopi', 'bread', 'groceries', 'fruit', 'ais-kacang', 'burger', 'chicken-rice', 'fried-chicken', 'delivery-bag']],
+  ['iconGroupTransport', ['car', 'motorcycle', 'petrol', 'toll', 'lrt', 'bus', 'ehailing', 'parking', 'flight', 'house', 'keys', 'electricity', 'water', 'wifi', 'phone-bill', 'tv']],
+  ['iconGroupLife', ['shopping-bag', 'clothes', 'shoes', 'cosmetics', 'haircut', 'medicine', 'clinic', 'insurance', 'gym', 'popcorn', 'games', 'headphones', 'books', 'school', 'baby', 'pets']],
+  ['iconGroupMoney', ['salary', 'bonus', 'investment', 'gold', 'savings', 'bank', 'credit-card', 'donation', 'angpao', 'ketupat', 'lantern', 'diya', 'christmas', 'wedding', 'travel', 'birthday']],
+];
+const ICON_IDS = new Set(ICON_PACK.flatMap(([, ids]) => ids));
+const iconSrc = (id) => `icons/cat3d/${id}.webp`;
+// 只有 Pro 顯示自訂 3D 圖示;訂閱到期就回到預設線條 icon(設定保留,續訂即恢復)
+const activeIcon = (cat) => {
+  const v = cat?.icon;
+  if (!isPro || typeof v !== 'string' || !v.startsWith('3d:')) return null;
+  const id = v.slice(3);
+  return ICON_IDS.has(id) ? id : null;
+};
+
 function catIconEl(cat) {
   const el = document.createElement('span');
   el.className = 'cat-icon';
   const root = rootCat(cat);
   const color = root?.color || 'var(--cat-none)';
   el.style.setProperty('--cat', color);
+  const custom = activeIcon(root);
+  if (custom) {
+    el.classList.add('cat-icon-img');
+    const img = document.createElement('img');
+    img.src = iconSrc(custom);
+    img.alt = '';
+    img.decoding = 'async';
+    el.appendChild(img);
+    return el;
+  }
   const path = root && CAT_ICONS[root.id];
   if (path) {
     el.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
@@ -1920,7 +1956,10 @@ function renderCatList() {
       <span class="cat-row-name"></span>
       <span class="cat-row-count"></span>
       <span class="cat-row-chevron">›</span>`;
-    row.querySelector('.cat-dot').style.background = cat.color;
+    const dot = row.querySelector('.cat-dot');
+    // Pro 自訂 3D 圖示取代色點(只限頂層分類)
+    if (!cat.parentId && activeIcon(cat)) dot.replaceWith(catIconEl(cat));
+    else dot.style.background = cat.color;
     row.querySelector('.cat-row-name').textContent = catName(cat);
     row.querySelector('.cat-row-count').textContent = count > 0 ? t('entryCount', count) : '';
     row.addEventListener('click', () => openCatEditor(cat));
@@ -2264,6 +2303,10 @@ function openCatEditor(cat, parentId = null) {
   catDeleteBtn.textContent = isSub ? t('deleteSubcategory') : t('deleteCategory');
   // 子分類只有名字:顏色跟母分類,預算算在母分類
   colorGridEl.hidden = isSub;
+  // 圖示只給頂層分類(子分類跟母分類)
+  editorIcon = cat?.icon ?? null;
+  $('#cat-icon-field').hidden = isSub;
+  renderIconField();
   const type = cat ? cat.type : catManageType;
   catBudgetField.hidden = isSub || type !== 'expense';
   catBudgetInput.value = cat?.budgetCents ? centsToInputStr(cat.budgetCents) : '';
@@ -2275,6 +2318,71 @@ function openCatEditor(cat, parentId = null) {
 function closeCatEditor() {
   catEditorEl.classList.remove('open');
   catEditorBackdropEl.classList.remove('open');
+}
+
+let editorIcon = null;   // '3d:<id>' 或 null(預設線條 icon)
+
+function renderIconField() {
+  const prev = $('#cat-icon-preview');
+  prev.innerHTML = '';
+  const id = typeof editorIcon === 'string' && editorIcon.startsWith('3d:') ? editorIcon.slice(3) : null;
+  if (id && ICON_IDS.has(id)) {
+    const img = document.createElement('img');
+    img.src = iconSrc(id); img.alt = '';
+    prev.appendChild(img);
+    $('#cat-icon-value').textContent = '';
+  } else {
+    $('#cat-icon-value').textContent = t('iconDefault');
+  }
+}
+
+function openIconSheet() {
+  const wrap = $('#icon-grid');
+  wrap.innerHTML = '';
+  const note = $('#icon-pro-note');
+  note.hidden = isPro;
+  note.textContent = t('iconProNote');
+  const pick = (value) => { editorIcon = value; renderIconField(); closeIconSheet(); };
+  // 第一格:預設(免費線條 icon)
+  const def = document.createElement('button');
+  def.type = 'button';
+  def.className = 'icon-cell icon-cell-default' + (!editorIcon ? ' selected' : '');
+  def.textContent = t('iconDefault');
+  def.addEventListener('click', () => pick(null));
+  wrap.appendChild(def);
+  for (const [groupKey, ids] of ICON_PACK) {
+    const h = document.createElement('div');
+    h.className = 'section-label icon-group-label';
+    h.textContent = t(groupKey);
+    wrap.appendChild(h);
+    const grid = document.createElement('div');
+    grid.className = 'icon-grid';
+    for (const id of ids) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'icon-cell' + (editorIcon === `3d:${id}` ? ' selected' : '') + (isPro ? '' : ' locked');
+      b.setAttribute('aria-label', id.replace(/-/g, ' '));
+      b.innerHTML = `<img src="${iconSrc(id)}" alt="" loading="lazy" decoding="async">${isPro ? '' : '<span class="icon-lock">👑</span>'}`;
+      b.addEventListener('click', () => {
+        if (!isPro) {
+          // 非 Pro:帶去 Pro 頁
+          closeIconSheet();
+          closeCatEditor();
+          showSettingsPage('pro', 'proTitle');
+          return;
+        }
+        pick(`3d:${id}`);
+      });
+      grid.appendChild(b);
+    }
+    wrap.appendChild(grid);
+  }
+  $('#icon-sheet').classList.add('open');
+  $('#icon-backdrop').classList.add('open');
+}
+function closeIconSheet() {
+  $('#icon-sheet').classList.remove('open');
+  $('#icon-backdrop').classList.remove('open');
 }
 
 async function onCatSave() {
@@ -2301,6 +2409,7 @@ async function onCatSave() {
         cat.name = name;
       }
       if (!cat.parentId) {
+        if (editorIcon) cat.icon = editorIcon; else delete cat.icon;
         cat.color = editorColor;
         // 子分類存的顏色一起更新(顯示時本來就跟母分類走,這裡讓匯出/舊版也一致)
         for (const s of subCatsOf(cat.id)) s.color = editorColor;
@@ -2309,6 +2418,7 @@ async function onCatSave() {
     }
   } else {
     const cat = { id: crypto.randomUUID(), name, color: editorColor, type: catManageType };
+    if (editorIcon) cat.icon = editorIcon;
     if (catManageType === 'expense') cat.budgetCents = budgetCents;
     categories.push(cat);
   }
@@ -2694,6 +2804,8 @@ function sanitizeCategory(c) {
   if (c.renamed === true) out.renamed = true;
   // 子分類的母分類 id —— 漏掉的話,同步/還原後所有子分類都會被攤平成頂層
   if (typeof c.parentId === 'string' && c.parentId && c.parentId !== out.id) out.parentId = c.parentId;
+  // Pro 自訂圖示(optional);未知的 id 直接略過
+  if (typeof c.icon === 'string' && c.icon.startsWith('3d:') && ICON_IDS.has(c.icon.slice(3))) out.icon = c.icon;
   const budget = Math.round(Number(c.budgetCents));
   if (Number.isFinite(budget) && budget > 0) out.budgetCents = budget;
   return out;
@@ -3451,6 +3563,7 @@ async function iapReady() {
 // 訂閱週期文字:Apple 3.1.2 要求購買點清楚標示「長度」,且說明不可與實際方案不符
 const planUnit = () => t('unitSixMonths');
 
+let lastIconPro = false;
 function updateProUI() {
   const label = $('#pro-label');
   const status = $('#pro-status');
@@ -3482,6 +3595,13 @@ function updateProUI() {
   const legal = $('#pro-legal');
   if (legal) legal.hidden = !(IS_NATIVE && !isPro);
   renderPlanPicker();
+  // Pro 狀態改變 → 3D 分類圖示顯示 / 隱藏
+  if (isPro !== lastIconPro) {
+    lastIconPro = isPro;
+    renderList();
+    renderReport();
+    renderCatList();
+  }
   syncAds();
   updateSettingsHubStatuses();
 }
@@ -4027,6 +4147,9 @@ $('#detail-back-btn').addEventListener('click', closeCatDetail);
 $('#trends-back-btn').addEventListener('click', closeTrends);
 $('#fixed-chip').addEventListener('click', () => setFixedOn(!fixedOn));
 $('#account-picker').addEventListener('click', openAccountPick);
+$('#cat-icon-field').addEventListener('click', openIconSheet);
+$('#icon-cancel').addEventListener('click', closeIconSheet);
+$('#icon-backdrop').addEventListener('click', closeIconSheet);
 $('#pick-cancel').addEventListener('click', closePick);
 $('#pick-backdrop').addEventListener('click', closePick);
 dateInput.addEventListener('change', renderDateChips);
