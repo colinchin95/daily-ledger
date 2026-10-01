@@ -203,6 +203,11 @@ const STRINGS = {
     proBenefit3: 'No ads',
     proBenefit4: '60+ Malaysian 3D category icons',
     rateApp: 'Rate RichAuntie',
+    loaderBoot: 'Rich Auntie is counting…',
+    loaderScreenshot: 'Rich Auntie is reading your payment…',
+    loaderReceipt: 'Rich Auntie is reading your receipt…',
+    loaderPayslip: 'Rich Auntie is checking your payslip…',
+    loaderStatement: 'Rich Auntie is going through your statement…',
     rateAppValue: '★★★★★',
     instRetirement: 'Retirement',
     epfAcctHint: "Your EPF contributions from payslips (yours + employer's) are added automatically. Update the balance anytime from KWSP i-Akaun.",
@@ -439,8 +444,8 @@ let currency = (() => {
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
-const APP_MARKETING_VERSION = '1.5';
-const WEB_BUILD = 20;
+const APP_MARKETING_VERSION = '1.5.1';
+const WEB_BUILD = 21;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2121,6 +2126,7 @@ async function onPayslipFile(file) {
   btn.disabled = true;
   btn.classList.add('busy');
   label.textContent = t('scanningPayslip');
+  showLoader('loaderPayslip');
   try {
     const image = await fileToBase64(file, 1800, 0.8);   // 薪資單字小,解析度給高一點
     const res = await fetch(RECEIPT_ENDPOINT, {
@@ -2131,6 +2137,7 @@ async function onPayslipFile(file) {
     if (!res.ok) {
       let e = {};
       try { e = await res.json(); } catch {}
+      hideLoader(true);
       if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
       else if (res.status === 429) alert(t('receiptRate'));
       else if (res.status === 503) alert(t('receiptBusy'));
@@ -2155,6 +2162,7 @@ async function onPayslipFile(file) {
   } catch {
     alert(t('payslipFailed'));
   } finally {
+    hideLoader();
     btn.disabled = false;
     btn.classList.remove('busy');
     label.textContent = original;
@@ -3668,6 +3676,31 @@ async function onSyncEnable() {
   renderRecurList();
 }
 
+// ---------- Loading 動畫(Rich Auntie 數錢) ----------
+// 可巢狀呼叫(例如背面輕點 → 收據辨識):計數歸零才收起。
+let loaderDepth = 0;
+function showLoader(textKey = 'loaderBoot') {
+  const el = $('#auntie-loader');
+  loaderDepth += 1;
+  el.classList.remove('boot');
+  // 巢狀時保留外層文字(背面輕點 →「reading your payment」)
+  if (loaderDepth === 1) $('#al-text').textContent = t(textKey);
+  el.hidden = false;
+  requestAnimationFrame(() => el.classList.add('show'));
+  $('#al-video').play?.().catch(() => {});
+}
+function hideLoader(force = false) {
+  const el = $('#auntie-loader');
+  loaderDepth = force ? 0 : Math.max(0, loaderDepth - 1);
+  if (loaderDepth > 0) return;
+  el.classList.remove('show', 'boot');
+  setTimeout(() => {
+    if (loaderDepth > 0) return;
+    el.hidden = true;
+    $('#al-video').pause?.();
+  }, 220);
+}
+
 // ---------- 收據辨識(Claude vision) ----------
 const RECEIPT_ENDPOINT = 'https://daily-ledger-sync.yuxuanchin95.workers.dev/receipt';
 
@@ -3732,6 +3765,7 @@ async function scanReceiptImage(image) {
   btn.disabled = true;
   btn.classList.add('busy');
   label.textContent = t('scanningReceipt');
+  showLoader('loaderReceipt');
   try {
     const names = aiCategoryLabels('expense');
     const res = await fetch(RECEIPT_ENDPOINT, {
@@ -3747,6 +3781,7 @@ async function scanReceiptImage(image) {
     if (!res.ok) {
       let e = {};
       try { e = await res.json(); } catch {}
+      hideLoader(true);
       if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
       else if (res.status === 429) alert(t('receiptRate'));
       else if (res.status === 503) alert(t('receiptBusy'));
@@ -3775,6 +3810,7 @@ async function scanReceiptImage(image) {
     alert(t('receiptFailed'));
     return false;
   } finally {
+    hideLoader();
     btn.disabled = false;
     btn.classList.remove('busy');
     label.textContent = original;
@@ -4106,6 +4142,7 @@ async function onStatementFile(file) {
   const btn = $('#import-stmt-btn');
   btn.disabled = true;
   btn.classList.add('busy');
+  showLoader('loaderStatement');
   stmtProgress(0);                       // 讀取檔案
   try {
     const names = aiCategoryLabels('expense');
@@ -4143,11 +4180,13 @@ async function onStatementFile(file) {
       });
     }
 
+    hideLoader(true);
     if (!txns || !txns.length) { alert(t('reconEmpty')); return; }
     stmtProgress(2);                     // 比對帳目
     openRecon(txns);
     stmtProgressDone();
   } catch (err) {
+    hideLoader(true);
     if (err.code === 'quota') alert(IS_NATIVE ? t('reconQuotaNative') : t('reconQuota'));
     else if (err.code === 'rate') alert(t('receiptRate'));
     else if (err.code === 'global') alert(t('receiptBusy'));
@@ -4155,6 +4194,7 @@ async function onStatementFile(file) {
   } finally {
     // 還在 busy = 中途失敗,直接收掉(成功路徑已由 stmtProgressDone 收尾)
     if ($('#stmt-progress-track').classList.contains('busy')) stmtProgress(null);
+    hideLoader(true);
     btn.disabled = false;
     btn.classList.remove('busy');
   }
@@ -4464,6 +4504,7 @@ const launchToAdd = () => { try { return localStorage.getItem(LAUNCH_ADD_KEY) ==
 function quickAdd(type = 'expense') {
   if (catModalEl.classList.contains('open')) closeCatModal();
   if (detailModalEl.classList.contains('open')) closeCatDetail();
+  if ($('#trends-modal').classList.contains('open')) closeTrends();
   switchView('list');
   openSheet();
   if (type === 'income') setSheetType('income');
@@ -4519,7 +4560,9 @@ const raScan = async (b64) => {
   try {
     quickAdd();
     if (!ensureAiConsent('receipt')) return;
-    const ok = await scanReceiptImage(b64);
+    showLoader('loaderScreenshot');
+    $('#al-text').textContent = t('loaderScreenshot');
+    const ok = await scanReceiptImage(b64).finally(() => hideLoader());
     if (!ok || !autoSaveScans()) return;
     // 自動存檔:AI 沒給分類就放「Other」,金額一定要有
     if (!selectedCatId) {
@@ -4746,6 +4789,7 @@ async function init() {
   maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
   maybeShowBackupBanner();        // 太久沒備份就提醒
   maybeShowBacktapBanner();       // iOS:引導設定背面輕點記帳
+  hideLoader(true);               // 啟動動畫收起(資料已載入)
   initQuickAdd();                 // 背面輕點 / 捷徑 / 長按圖示 → 直接記帳
 
   // PWA:註冊 service worker(需要 https 或 localhost)。
@@ -4760,3 +4804,5 @@ async function init() {
 }
 
 init();
+// 保險:啟動出錯也不要讓 loading 一直蓋著畫面
+setTimeout(() => { if ($('#auntie-loader').classList.contains('boot')) hideLoader(true); }, 15000);

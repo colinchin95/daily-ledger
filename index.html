@@ -15,6 +15,14 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Rich Auntie 數錢的 loading 動畫:啟動時預設顯示(CSS 延遲淡入,快的話看不到),init 完成即收起 -->
+  <div id="auntie-loader" class="auntie-loader boot" role="status" aria-live="polite">
+    <div class="al-card">
+      <video id="al-video" class="al-video" src="icons/loader/auntie-counting.mp4" poster="icons/loader/auntie-counting.jpg" muted loop playsinline autoplay preload="auto" disablepictureinpicture></video>
+      <div id="al-text" class="al-text">Rich Auntie is counting…</div>
+      <div class="al-dots"><span></span><span></span><span></span></div>
+    </div>
+  </div>
   <header class="app-header">
     <div class="nav-bar header-bar">
       <span class="nav-spacer"></span>

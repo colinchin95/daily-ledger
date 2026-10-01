@@ -1856,3 +1856,43 @@ body.has-ad .modal {
 .rate-stars { color: var(--accent); letter-spacing: 1px; }
 .ps-list .ps-row { position: relative; }
 .ps-list .ps-row + .ps-row::before { left: 0; right: 0; }
+
+/* ---------- Loading 動畫:Rich Auntie 數錢 ---------- */
+.auntie-loader {
+  position: fixed; inset: 0; z-index: 90;   /* 在所有面板之上、App 鎖(100)之下 */
+  display: grid; place-items: center; padding: 24px;
+  background: rgba(30, 22, 12, 0.38);
+  -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  opacity: 0; transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.auntie-loader[hidden] { display: none; }
+.auntie-loader.show { opacity: 1; pointer-events: auto; }
+/* 啟動:載入快就不出現;慢(冷啟動)才在 0.6 秒後淡入;20 秒保險自動消失 */
+.auntie-loader.boot { animation: al-boot 20s linear forwards; pointer-events: auto; }
+@keyframes al-boot {
+  0%, 3% { opacity: 0; }
+  5%, 98% { opacity: 1; }
+  100% { opacity: 0; visibility: hidden; }
+}
+.al-card {
+  width: min(260px, 72vw); padding: 14px 14px 16px; border-radius: 26px;
+  background: #F7E2C7;   /* 與影片底色一致 */
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  text-align: center; transform: scale(0.96); transition: transform 0.25s var(--spring, ease);
+}
+.auntie-loader.show .al-card, .auntie-loader.boot .al-card { transform: scale(1); }
+.al-video {
+  width: 100%; aspect-ratio: 1; display: block; border-radius: 18px; object-fit: cover;
+  background: #F7E2C7 url('icons/loader/auntie-counting.jpg') center / cover no-repeat;
+  /* 邊緣淡出,融進卡片底色 */
+  -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 62%, transparent 72%);
+  mask-image: radial-gradient(circle at 50% 50%, #000 62%, transparent 72%);
+}
+.al-text { margin-top: 6px; font-size: 15px; font-weight: 600; color: #4A3A26; line-height: 1.35; }
+.al-dots { display: flex; justify-content: center; gap: 6px; margin-top: 10px; }
+.al-dots span { width: 7px; height: 7px; border-radius: 50%; background: #B8891A; animation: al-dot 1.2s ease-in-out infinite; }
+.al-dots span:nth-child(2) { animation-delay: 0.15s; }
+.al-dots span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes al-dot { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-4px); } }
+@media (prefers-reduced-motion: reduce) { .al-dots span { animation: none; opacity: 0.7; } }
