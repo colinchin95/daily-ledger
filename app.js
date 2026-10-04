@@ -328,7 +328,7 @@ const STRINGS = {
     reconQuota: "You've used this month's reconcile quota. Pro includes 12 statements a month.",
     reconQuotaNative: "You've used this month's reconcile quota. If you already have Pro, tap “Restore purchase”.",
     scanningReceipt: 'Scanning…',
-    receiptFailed: "Couldn't read the receipt — please enter manually.",
+    receiptFailed: "Rich Auntie couldn't read this one. Please try again, or enter it manually.",
     receiptQuota: (n) => `You've used all ${n} free scans this month. Upgrade to Pro for unlimited, or add it manually.`,
     proPitch: 'Go Pro: snap any receipt and AI auto-fills the amount, date, merchant, and category — no more typing, scan as much as you want. Free plan includes 5 scans a month.',
     proThanks: 'Thanks for supporting RichAuntie 💛 Your receipt scanning is now unlimited.',
@@ -457,7 +457,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 22;
+const WEB_BUILD = 23;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2149,11 +2149,10 @@ async function onPayslipFile(file) {
     if (!res.ok) {
       let e = {};
       try { e = await res.json(); } catch {}
-      hideLoader(true);
-      if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
-      else if (res.status === 429) alert(t('receiptRate'));
-      else if (res.status === 503) alert(t('receiptBusy'));
-      else alert(t('payslipFailed'));
+      if (res.status === 429 && e.error === 'quota') await alertAfterLoader(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
+      else if (res.status === 429) await alertAfterLoader(t('receiptRate'));
+      else if (res.status === 503) await alertAfterLoader(t('receiptBusy'));
+      else await alertAfterLoader(t('payslipFailed'));
       return;
     }
     const r = await res.json();
@@ -2170,9 +2169,9 @@ async function onPayslipFile(file) {
     if (typeof r.payDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.payDate)) { dateInput.value = r.payDate; renderDateChips(); }
     if (r.employer && !noteInput.value.trim()) noteInput.value = String(r.employer).slice(0, 60);
     renderPayslipTotals();
-    if (!any) alert(t('payslipFailed'));
+    if (!any) await alertAfterLoader(t('payslipFailed'));
   } catch {
-    alert(t('payslipFailed'));
+    await alertAfterLoader(t('payslipFailed'));
   } finally {
     hideLoader();
     btn.disabled = false;
@@ -3701,6 +3700,13 @@ function showLoader(textKey = 'loaderBoot') {
   requestAnimationFrame(() => el.classList.add('show'));
   $('#al-video').play?.().catch(() => {});
 }
+// 跳 alert 前先收起 loading,並等畫面更新(alert 會阻塞繪製,否則提示會疊在 loading 上)
+async function alertAfterLoader(msg) {
+  hideLoader(true);
+  await new Promise((r) => setTimeout(r, 260));
+  alert(msg);
+}
+
 function hideLoader(force = false) {
   const el = $('#auntie-loader');
   loaderDepth = force ? 0 : Math.max(0, loaderDepth - 1);
@@ -3793,11 +3799,10 @@ async function scanReceiptImage(image) {
     if (!res.ok) {
       let e = {};
       try { e = await res.json(); } catch {}
-      hideLoader(true);
-      if (res.status === 429 && e.error === 'quota') alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
-      else if (res.status === 429) alert(t('receiptRate'));
-      else if (res.status === 503) alert(t('receiptBusy'));
-      else alert(t('receiptFailed'));
+      if (res.status === 429 && e.error === 'quota') await alertAfterLoader(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
+      else if (res.status === 429) await alertAfterLoader(t('receiptRate'));
+      else if (res.status === 503) await alertAfterLoader(t('receiptBusy'));
+      else await alertAfterLoader(t('receiptFailed'));
       return false;
     }
     const r = await res.json();
@@ -3819,7 +3824,7 @@ async function scanReceiptImage(image) {
     updateSaveState();
     return typeof r.amount === 'number' && r.amount > 0;
   } catch {
-    alert(t('receiptFailed'));
+    await alertAfterLoader(t('receiptFailed'));
     return false;
   } finally {
     hideLoader();
@@ -4192,17 +4197,16 @@ async function onStatementFile(file) {
       });
     }
 
+    if (!txns || !txns.length) { await alertAfterLoader(t('reconEmpty')); return; }
     hideLoader(true);
-    if (!txns || !txns.length) { alert(t('reconEmpty')); return; }
     stmtProgress(2);                     // 比對帳目
     openRecon(txns);
     stmtProgressDone();
   } catch (err) {
-    hideLoader(true);
-    if (err.code === 'quota') alert(IS_NATIVE ? t('reconQuotaNative') : t('reconQuota'));
-    else if (err.code === 'rate') alert(t('receiptRate'));
-    else if (err.code === 'global') alert(t('receiptBusy'));
-    else alert(t('reconFailed'));
+    if (err.code === 'quota') await alertAfterLoader(IS_NATIVE ? t('reconQuotaNative') : t('reconQuota'));
+    else if (err.code === 'rate') await alertAfterLoader(t('receiptRate'));
+    else if (err.code === 'global') await alertAfterLoader(t('receiptBusy'));
+    else await alertAfterLoader(t('reconFailed'));
   } finally {
     // 還在 busy = 中途失敗,直接收掉(成功路徑已由 stmtProgressDone 收尾)
     if ($('#stmt-progress-track').classList.contains('busy')) stmtProgress(null);
