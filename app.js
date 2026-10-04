@@ -133,7 +133,7 @@ const STRINGS = {
     applePayStep1Hint: 'Open the <b>Shortcuts</b> app → <b>Automation</b> tab → <b>+</b> → <b>Transaction</b>. Pick your cards, choose <b>Run Immediately</b>, then tap <b>Next</b>.',
     applePayStep1Btn: 'Open Shortcuts',
     applePayStep2: 'Add the RichAuntie action',
-    applePayStep2Hint: 'Tap <b>Create New Shortcut</b>, search <b>RichAuntie</b> and choose <b>Log Apple Pay Payment</b>.',
+    applePayStep2Hint: 'Tap <b>Create New Shortcut</b>, search <b>RichAuntie</b> and choose <b>Log Card Payment</b>.',
     applePayStep3: 'Connect the details',
     applePayStep3Hint: 'Tap <b>Amount</b> → <b>Shortcut Input</b> → <b>Amount</b>. Do the same for <b>Merchant</b> (→ Merchant) and <b>Card</b> (→ Card or Pass). Tap <b>Done</b>.',
     applePayStep4: 'Pay as usual',
@@ -457,7 +457,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 23;
+const WEB_BUILD = 24;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
