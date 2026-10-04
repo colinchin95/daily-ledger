@@ -127,6 +127,18 @@ const STRINGS = {
     ],
     quickAddLaunchToggle: 'Open straight to a new entry',
     quickAddAutoSave: 'Save screenshot entries automatically',
+    applePayTitle: 'Apple Pay auto-log',
+    applePayIntro: 'Pay with Apple Pay and RichAuntie logs it by itself: amount, shop and card. No screenshot, no tapping. Needs iOS 17 or later.',
+    applePayStep1: 'Create the automation',
+    applePayStep1Hint: 'Open the <b>Shortcuts</b> app → <b>Automation</b> tab → <b>+</b> → <b>Transaction</b>. Pick your cards, choose <b>Run Immediately</b>, then tap <b>Next</b>.',
+    applePayStep1Btn: 'Open Shortcuts',
+    applePayStep2: 'Add the RichAuntie action',
+    applePayStep2Hint: 'Tap <b>Create New Shortcut</b>, search <b>RichAuntie</b> and choose <b>Log Apple Pay Payment</b>.',
+    applePayStep3: 'Connect the details',
+    applePayStep3Hint: 'Tap <b>Amount</b> → <b>Shortcut Input</b> → <b>Amount</b>. Do the same for <b>Merchant</b> (→ Merchant) and <b>Card</b> (→ Card or Pass). Tap <b>Done</b>.',
+    applePayStep4: 'Pay as usual',
+    applePayStep4Hint: 'Next time you pay with Apple Pay, the payment appears in RichAuntie with a category guessed from the shop. Tap it to change anything.',
+    applePayToast: (n, amt, shop) => n === 1 ? `Apple Pay: ${amt}${shop ? ' at ' + shop : ''} logged` : `Apple Pay: ${n} payments logged`,
     quickAddAutoSaveHint: 'Uses one AI receipt scan per screenshot. When off, the entry is filled in and waits for you to tap Save.',
     quickAddLaunchHint: 'When RichAuntie is opened (or reopened after 30 seconds away), start on the new-expense keypad.',
     quickAddTry: 'Try it now',
@@ -444,8 +456,8 @@ let currency = (() => {
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
-const APP_MARKETING_VERSION = '1.5.1';
-const WEB_BUILD = 21;
+const APP_MARKETING_VERSION = '1.5.2';
+const WEB_BUILD = 22;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -4525,6 +4537,7 @@ function handleQuickAddUrl(raw) {
 function initQuickAdd() {
   // 資料載入完才開放給原生呼叫;原生端會一直等到這個函式出現
   window.__raScan = raScan;
+  window.__raApplePay = raApplePay;
   // PWA 捷徑:./?action=add
   if (handleQuickAddUrl(location.href)) {
     history.replaceState(null, '', location.pathname);
@@ -4547,6 +4560,126 @@ function initQuickAdd() {
     if (document.hidden) { hiddenAt = Date.now(); return; }
     if (launchToAdd() && hiddenAt && Date.now() - hiddenAt > 30000 && !sheetEl.classList.contains('open')) quickAdd();
   });
+}
+
+// ---------- Apple Pay 自動記帳 ----------
+// 原生 LogApplePayIntent 把交易排隊,App 回前景時以 base64 JSON 丟進 window.__raApplePay。
+// 每筆的 id 由原生產生,直接當 entry id → 重送不會重複記。
+const MERCHANT_RULES = [
+  ['food-delivery', /grab\W*food|food\W*panda|shopee\W*food|deliveroo/],
+  ['transport-petrol', /petronas|\bshell\b|petron|caltex|bhp|setel/],
+  ['transport-ehailing', /\bgrab\b|maxim|indrive|airasia ride/],
+  ['transport-toll', /\bplus\b|touch\s*'?n\s*go|\btng\b|smart\s*tag|\btoll/],
+  ['transport-parking', /parking|jomparking|flexi\s*park|\bpark\b/],
+  ['transport-public', /rapid\s*kl|prasarana|\bmrt\b|\blrt\b|\bktm\b/],
+  ['food-drinks', /starbucks|\bzus\b|tealive|coffee\s*bean|gigi|chagee|mixue|bask\s*bear|kenangan|kopi\b/],
+  ['food-groceries', /aeon|jaya\s*grocer|village\s*grocer|lotus|tesco|mydin|giant|econsave|speedmart|\bnsk\b|cold\s*storage|mercato|7-?eleven|family\s*mart|kk\s*mart|99\s*speed/],
+  ['shopping-online', /shopee|lazada|temu|zalora|amazon/],
+  ['shopping-personal', /watsons|guardian|sephora|\bsasa\b/],
+  ['medical-pharmacy', /pharmacy|farmasi|caring|alpro/],
+  ['medical-clinic', /clinic|klinik|hospital|dental|medical/],
+  ['fun-movies', /\bgsc\b|\btgv\b|\bmbo\b|cinema|golden\s*screen/],
+  ['fun-subscriptions', /netflix|spotify|apple\.com|youtube|disney|icloud|astro/],
+  ['home-electricity', /\btnb\b|tenaga/],
+  ['home-water', /air\s*selangor|syabas|indah\s*water|\bsab\b/],
+  ['home-internet', /unifi|maxis|celcom|\bdigi\b|u\s*mobile|\byes\b|time\s*(dotcom|internet)/],
+  ['food', /mcdonald|\bkfc\b|pizza|subway|burger|restoran|restaurant|mamak|nasi|kopitiam|sushi|marrybrown|texas|domino|secret\s*recipe|oldtown|cafe|bakery/],
+  ['shopping', /uniqlo|\bh&m\b|ikea|mr\.?\s*diy|daiso|padini|decathlon|popular|mph/],
+];
+
+// 全大寫的商家名轉成 Title Case(AEON SMKT TEBRAU → Aeon Smkt Tebrau)
+function tidyMerchant(raw) {
+  const m = String(raw || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+  if (!m || m !== m.toUpperCase()) return m;
+  // 2 個字母以內或含數字的(KL、JB、SS2)維持大寫
+  return m.split(' ').map((w) => (w.length <= 2 || /\d/.test(w) ? w : w.charAt(0) + w.slice(1).toLowerCase())).join(' ');
+}
+
+function guessCategoryForMerchant(merchant) {
+  const cats = catMap();
+  const key = merchant.toLowerCase();
+  // 1. 學習:同一家店上次被歸到哪類(使用者改過的分類也算)
+  if (key) {
+    const prev = [...entries].reverse().find((e) => e.type === 'expense' && (e.note || '').toLowerCase() === key && cats.has(e.categoryId));
+    if (prev) return prev.categoryId;
+  }
+  // 2. 內建規則;子分類被刪就退回母分類
+  for (const [id, re] of MERCHANT_RULES) {
+    if (!re.test(key)) continue;
+    if (cats.has(id)) return id;
+    const parent = id.split('-')[0];
+    if (cats.has(parent)) return parent;
+  }
+  // 3. 其他
+  if (cats.has('other')) return 'other';
+  return catsOfType('expense')[0]?.id ?? '';
+}
+
+// 卡片名稱(例:Maybank Visa、CIMB Platinum)→ 對應的銀行帳戶
+function matchAccountForCard(card) {
+  const c = String(card || '').toLowerCase();
+  if (c) {
+    // 整字比對,避免「bank」配到「maybank」;太通用的字不算
+    const generic = new Set(['bank', 'cash', 'card', 'credit', 'debit', 'visa', 'mastercard', 'account']);
+    const esc = (k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    for (const a of accounts) {
+      const inst = acctInst(a);
+      const keys = [acctName(a), inst?.name, inst?.short, inst?.id].filter(Boolean)
+        .map((k) => String(k).toLowerCase().split(/[\s(]/)[0])
+        .filter((k) => k.length >= 3 && !generic.has(k));
+      if (keys.some((k) => new RegExp(`\\b${esc(k)}\\b`).test(c))) return a.id;
+    }
+  }
+  return defaultAcctId();
+}
+
+let toastTimer = 0;
+function showToast(text) {
+  let el = $('#ra-toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'ra-toast';
+    el.className = 'ra-toast';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3600);
+}
+
+async function raApplePay(b64) {
+  let list = [];
+  try {
+    const bytes = Uint8Array.from(atob(String(b64)), (ch) => ch.charCodeAt(0));
+    list = JSON.parse(new TextDecoder().decode(bytes));
+  } catch { return; }
+  if (!Array.isArray(list)) return;
+  const added = [];
+  for (const tx of list) {
+    const id = typeof tx?.id === 'string' && tx.id ? 'ap-' + tx.id : null;
+    if (!id || entries.some((e) => e.id === id)) continue;
+    const amountCents = Math.round(parseFloat(tx.amount) * 100);
+    if (!(amountCents > 0)) continue;
+    const ts = Number(tx.ts) || Date.now();
+    const d = new Date(ts);
+    const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const note = tidyMerchant(tx.merchant);
+    const categoryId = guessCategoryForMerchant(note);
+    if (!categoryId) continue;
+    const entry = { id, createdAt: ts, type: 'expense', amountCents, categoryId, accountId: matchAccountForCard(tx.card), note, date, fixed: false };
+    entries.push(entry);
+    added.push(entry);
+  }
+  if (!added.length) return;
+  await saveEntries(entries);
+  schedulePush();
+  renderList();
+  if (!viewReportEl.hidden) renderReport();
+  if (detailCatId !== null) renderCatDetail();
+  const last = added[added.length - 1];
+  showToast(t('applePayToast', added.length, formatRM(last.amountCents), last.note));
 }
 
 // 背面輕點 → 捷徑「截圖」→「Log Expense from Screenshot」:原生把 JPEG base64 丟進來
@@ -4691,12 +4824,42 @@ function renderBacktapSetup(page) {
   b3.appendChild(hint(t('backtapStep3Hint')));
 }
 
+function renderApplePaySetup(page) {
+  const head = document.createElement('div');
+  head.className = 'section-label ap-section';
+  head.textContent = t('applePayTitle');
+  page.appendChild(head);
+  const intro = document.createElement('p');
+  intro.className = 'qa-intro';
+  intro.textContent = t('applePayIntro');
+  page.appendChild(intro);
+  [['applePayStep1', 'applePayStep1Hint', true], ['applePayStep2', 'applePayStep2Hint'], ['applePayStep3', 'applePayStep3Hint'], ['applePayStep4', 'applePayStep4Hint']]
+    .forEach(([title, hintKey, withBtn], i) => {
+      const card = document.createElement('div');
+      card.className = 'bt-step';
+      card.innerHTML = `<div class="bt-step-head"><span class="bt-num"></span><span class="bt-title"></span></div><div class="bt-body"><p class="bt-hint"></p></div>`;
+      card.querySelector('.bt-num').textContent = i + 1;
+      card.querySelector('.bt-title').textContent = t(title);
+      card.querySelector('.bt-hint').innerHTML = t(hintKey);   // 固定字串,只含 <b>
+      if (withBtn) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'bt-btn primary';
+        b.textContent = t('applePayStep1Btn');
+        b.addEventListener('click', () => openExternal('shortcuts://'));
+        card.querySelector('.bt-body').appendChild(b);
+      }
+      page.appendChild(card);
+    });
+}
+
 function renderQuickAddPage() {
   const page = $('#quickadd-body');
   const platform = window.Capacitor?.getPlatform?.() || 'web';
   if (platform === 'ios') {
     page.innerHTML = '';
     renderBacktapSetup(page);
+    renderApplePaySetup(page);
     const list = document.createElement('div');
     list.className = 'cat-list qa-actions';
     const row = document.createElement('label');
