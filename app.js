@@ -220,6 +220,9 @@ const STRINGS = {
     loaderReceipt: 'Rich Auntie is reading your receipt…',
     loaderPayslip: 'Rich Auntie is checking your payslip…',
     loaderStatement: 'Rich Auntie is going through your statement…',
+    loaderStatementN: (i, n) => `Rich Auntie is going through file ${i} of ${n}…`,
+    stmtTooMany: (n) => `You can import up to ${n} files at a time. The first ${n} will be imported.`,
+    stmtSomeFailed: (bad, total) => `${bad} of ${total} couldn't be read. The rest are ready to review.`,
     rateAppValue: '★★★★★',
     instRetirement: 'Retirement',
     epfAcctHint: "Your EPF contributions from payslips (yours + employer's) are added automatically. Update the balance anytime from KWSP i-Akaun.",
@@ -325,7 +328,7 @@ const STRINGS = {
     reconOtherCard: (n) => `${n} more not on this card`,
     reconEmpty: "Couldn't find any transactions in that file.",
     reconFailed: "Couldn't read the statement. If the PDF is password-protected, open it and take a screenshot, or export a CSV from your bank instead.",
-    reconQuota: "You've used this month's reconcile quota. Pro includes 12 statements a month.",
+    reconQuota: "You've used this month's reconcile quota. Pro includes 30 statements a month.",
     reconQuotaNative: "You've used this month's reconcile quota. If you already have Pro, tap “Restore purchase”.",
     scanningReceipt: 'Scanning…',
     receiptFailed: "Rich Auntie couldn't read this one. Please try again, or enter it manually.",
@@ -335,6 +338,7 @@ const STRINGS = {
     proNativeHint: 'Receipt scanning is a Pro feature. Already purchased elsewhere? Tap “Restore purchase” below to activate.',
     receiptQuotaNative: 'You’ve used all your free scans this month. Add entries manually, or tap “Restore purchase” if you already have Pro.',
     receiptRate: 'Too many scans right now — please try again shortly.',
+    receiptRateIn: (m) => `Rich Auntie needs a short break. Please try again in about ${m} minute${m === 1 ? '' : 's'}.`,
     receiptBusy: 'The server is busy — please try again later.',
     receiptSection: 'Receipt scanning',
     upgradePro: 'Upgrade to Pro',
@@ -457,7 +461,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 24;
+const WEB_BUILD = 25;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2150,7 +2154,7 @@ async function onPayslipFile(file) {
       let e = {};
       try { e = await res.json(); } catch {}
       if (res.status === 429 && e.error === 'quota') await alertAfterLoader(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
-      else if (res.status === 429) await alertAfterLoader(t('receiptRate'));
+      else if (res.status === 429) await alertAfterLoader(rateMsg(e.retryAfter));
       else if (res.status === 503) await alertAfterLoader(t('receiptBusy'));
       else await alertAfterLoader(t('payslipFailed'));
       return;
@@ -3700,6 +3704,9 @@ function showLoader(textKey = 'loaderBoot') {
   requestAnimationFrame(() => el.classList.add('show'));
   $('#al-video').play?.().catch(() => {});
 }
+// 頻率限制訊息:伺服器有回 retryAfter(秒)就告訴使用者大約幾分鐘
+const rateMsg = (sec) => (Number(sec) > 0 ? t('receiptRateIn', Math.max(1, Math.ceil(Number(sec) / 60))) : t('receiptRate'));
+
 // 跳 alert 前先收起 loading,並等畫面更新(alert 會阻塞繪製,否則提示會疊在 loading 上)
 async function alertAfterLoader(msg) {
   hideLoader(true);
@@ -3800,7 +3807,7 @@ async function scanReceiptImage(image) {
       let e = {};
       try { e = await res.json(); } catch {}
       if (res.status === 429 && e.error === 'quota') await alertAfterLoader(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
-      else if (res.status === 429) await alertAfterLoader(t('receiptRate'));
+      else if (res.status === 429) await alertAfterLoader(rateMsg(e.retryAfter));
       else if (res.status === 503) await alertAfterLoader(t('receiptBusy'));
       else await alertAfterLoader(t('receiptFailed'));
       return false;
@@ -4119,9 +4126,9 @@ $('#receipt-input').addEventListener('change', (e) => {
 
 $('#import-stmt-btn').addEventListener('click', () => $('#stmt-input').click());
 $('#stmt-input').addEventListener('change', (e) => {
-  const file = e.target.files[0];
+  const files = [...(e.target.files || [])];
   e.target.value = '';
-  onStatementFile(file);
+  onStatementFiles(files);
 });
 
 const reconSheetEl = $('#recon-sheet');
@@ -4153,9 +4160,75 @@ function stmtProgressDone() {
   setTimeout(() => { $('#stmt-progress').hidden = true; bar.style.width = '0%'; }, 450);
 }
 
-async function onStatementFile(file) {
-  if (!file) return;
+// 一次可選多個檔案(最多 10 個):
+// - 照片 / 截圖:全部放進同一個請求(kind 'images'),AI 一次讀完,只算一份對帳單額度;重疊的截圖由 AI 去重
+// - PDF / CSV:各自是一份完整對帳單,分開解析後合併,跨檔重複的交易只留一筆
+const STMT_MAX_FILES = 10;
+const isCsvFile = (f) => /\.csv$/i.test(f.name) || f.type === 'text/csv';
+const isPdfFile = (f) => /\.pdf$/i.test(f.name) || f.type === 'application/pdf';
+
+async function parseStatementJob(job, names) {
+  const base = { categories: names, installId: getInstallId(), lang };
+  if (job.type === 'csv') {
+    const text = await job.file.text();
+    // AI 優先:讓 Claude 一次做解析 + 支出類別智能分類;
+    // 失敗(額度用完/離線)才退回本地解析(類別會落在「其他」)。
+    let txns = null;
+    try {
+      txns = await parseWithAI({ ...base, kind: 'text', data: text });
+    } catch (aiErr) {
+      txns = parseCsv(text);
+      if (!txns) throw aiErr;
+    }
+    return txns && txns.length ? txns : parseCsv(text);
+  }
+  if (job.type === 'pdf') {
+    return parseWithAI({ ...base, kind: 'pdf', data: await fileToBase64Raw(job.file) });
+  }
+  // 圖片:一張走原本的 image;多張壓小一點一起送
+  if (job.files.length === 1) {
+    const data = await fileToBase64(job.files[0], 1800, 0.8); // 帳單字小,給高一點解析度
+    return parseWithAI({ ...base, kind: 'image', data, mediaType: 'image/jpeg' });
+  }
+  const data = [];
+  for (const f of job.files) data.push(await fileToBase64(f, 1600, 0.75));
+  return parseWithAI({ ...base, kind: 'images', data });
+}
+
+// 合併多份結果:同一份裡的重複交易保留(可能真的買了兩次),跨份重複的才去掉
+function mergeStatementTxns(groups) {
+  const keyOf = (x) => [x.date, Math.round(Number(x.amount) * 100), x.direction, String(x.desc || x.label || '').toLowerCase().replace(/\s+/g, ' ').trim()].join('|');
+  const seen = new Map();   // key → 之前各份裡出現的最多次數
+  const out = [];
+  for (const g of groups) {
+    const counts = new Map();
+    for (const x of g) counts.set(keyOf(x), (counts.get(keyOf(x)) || 0) + 1);
+    const used = new Map();
+    for (const x of g) {
+      const k = keyOf(x);
+      const n = (used.get(k) || 0) + 1;
+      used.set(k, n);
+      if (n > (seen.get(k) || 0)) out.push(x);
+    }
+    for (const [k, c] of counts) seen.set(k, Math.max(seen.get(k) || 0, c));
+  }
+  return out;
+}
+
+async function onStatementFiles(picked) {
+  let files = (picked || []).filter(Boolean);
+  if (!files.length) return;
   if (!ensureAiConsent('statement')) return;
+  if (files.length > STMT_MAX_FILES) {
+    alert(t('stmtTooMany', STMT_MAX_FILES));
+    files = files.slice(0, STMT_MAX_FILES);
+  }
+  const images = files.filter((f) => !isCsvFile(f) && !isPdfFile(f));
+  const jobs = [
+    ...files.filter((f) => isCsvFile(f) || isPdfFile(f)).map((f) => ({ type: isCsvFile(f) ? 'csv' : 'pdf', file: f })),
+    ...(images.length ? [{ type: 'images', files: images }] : []),
+  ];
+
   const btn = $('#import-stmt-btn');
   btn.disabled = true;
   btn.classList.add('busy');
@@ -4163,48 +4236,41 @@ async function onStatementFile(file) {
   stmtProgress(0);                       // 讀取檔案
   try {
     const names = aiCategoryLabels('expense');
-    let txns = null;
-
-    const isCsv = /\.csv$/i.test(file.name) || file.type === 'text/csv';
-    if (isCsv) {
-      const text = await file.text();
+    const groups = [];
+    let failed = 0;
+    let lastErr = null;
+    for (let i = 0; i < jobs.length; i++) {
+      if (jobs.length > 1) $('#al-text').textContent = t('loaderStatementN', i + 1, jobs.length);
       stmtProgress(1);                   // AI 解析
-      // AI 優先:讓 Claude 一次做解析 + 支出類別智能分類;
-      // 失敗(額度用完/離線)才退回本地解析(類別會落在「其他」)。
       try {
-        txns = await parseWithAI({
-          kind: 'text', data: text, categories: names,
-          installId: getInstallId(), lang,
-        });
-      } catch (aiErr) {
-        txns = parseCsv(text);
-        if (!txns) throw aiErr;
+        const txns = await parseStatementJob(jobs[i], names);
+        if (txns && txns.length) groups.push(txns);
+      } catch (err) {
+        failed += 1;
+        lastErr = err;
+        // 額度 / 頻率限制:後面的檔案也會失敗,直接停
+        if (['quota', 'rate', 'global'].includes(err.code)) { failed += jobs.length - i - 1; break; }
       }
-      if (!txns || !txns.length) txns = parseCsv(text);
-    } else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
-      const data = await fileToBase64Raw(file);
-      stmtProgress(1);                   // AI 解析
-      txns = await parseWithAI({
-        kind: 'pdf', data, categories: names,
-        installId: getInstallId(), lang,
-      });
-    } else {
-      const data = await fileToBase64(file, 1800, 0.8); // 帳單字小,給高一點解析度
-      stmtProgress(1);                   // AI 解析
-      txns = await parseWithAI({
-        kind: 'image', data, mediaType: 'image/jpeg', categories: names,
-        installId: getInstallId(), lang,
-      });
     }
 
-    if (!txns || !txns.length) { await alertAfterLoader(t('reconEmpty')); return; }
+    const txns = mergeStatementTxns(groups);
+    if (!txns.length) {
+      if (lastErr) throw lastErr;
+      await alertAfterLoader(t('reconEmpty'));
+      return;
+    }
     hideLoader(true);
     stmtProgress(2);                     // 比對帳目
     openRecon(txns);
     stmtProgressDone();
+    if (failed) {
+      showToast(lastErr?.code === 'rate' ? rateMsg(lastErr.retryAfter)
+        : lastErr?.code === 'quota' ? t(IS_NATIVE ? 'reconQuotaNative' : 'reconQuota')
+        : t('stmtSomeFailed', failed, jobs.length));
+    }
   } catch (err) {
     if (err.code === 'quota') await alertAfterLoader(IS_NATIVE ? t('reconQuotaNative') : t('reconQuota'));
-    else if (err.code === 'rate') await alertAfterLoader(t('receiptRate'));
+    else if (err.code === 'rate') await alertAfterLoader(rateMsg(err.retryAfter));
     else if (err.code === 'global') await alertAfterLoader(t('receiptBusy'));
     else await alertAfterLoader(t('reconFailed'));
   } finally {

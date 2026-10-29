@@ -205,6 +205,7 @@ export async function parseWithAI({ kind, data, mediaType, categories, installId
     err.code = e.error;
     err.status = res.status;
     err.limit = e.limit;
+    err.retryAfter = e.retryAfter;
     throw err;
   }
   const r = await res.json();
