@@ -340,6 +340,14 @@ const STRINGS = {
     receiptRate: 'Too many scans right now — please try again shortly.',
     receiptRateIn: (m) => `Rich Auntie needs a short break. Please try again in about ${m} minute${m === 1 ? '' : 's'}.`,
     receiptBusy: 'The server is busy — please try again later.',
+    scanRetryGeneric: "Rich Auntie couldn't read this one. Your image is still safe, so no need to take it again.\n\nTap OK to try again, or Cancel to enter it manually.",
+    scanRetryNoPayment: "Rich Auntie couldn't find a payment on that screen.\n\nTap OK to try again, or Cancel to enter it manually.",
+    scanBlank: 'Rich Auntie only saw a blank or black screen. Some apps block screenshots. Please upload a photo of the receipt instead, or enter it manually.',
+    scanCancelled: 'Scan cancelled. You can enter this one manually.',
+    scanSavedToast: (amt, shop) => `Rich Auntie saved ${amt}${shop ? ' at ' + shop : ''}`,
+    scanQueued: 'Rich Auntie has your screenshot. She will read it once you close this entry.',
+    scanLogCopy: 'Copy scan log',
+    scanLogCopied: 'Scan log copied. Paste it to us in your message.',
     receiptSection: 'Receipt scanning',
     upgradePro: 'Upgrade to Pro',
     upgradeProPrice: (p) => `Upgrade to Pro — ${p}/mo`,
@@ -461,7 +469,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 25;
+const WEB_BUILD = 26;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2002,6 +2010,8 @@ function setFixedOn(on) {
 function closeSheet() {
   sheetEl.classList.remove('open');
   sheetBackdropEl.classList.remove('open');
+  scanSheetHeld = false;
+  sheetWaiters.splice(0).forEach((check) => check());   // 排隊中的掃描可以接手了
 }
 
 // ---------- 鍵盤 ----------
@@ -3277,6 +3287,7 @@ function hideLock() {
   lockMode = null;
   pinBuffer = '';
   firstPin = '';
+  unlockWaiters.splice(0).forEach((done) => done());    // 掃描結果等解鎖才提示
 }
 
 function lockError(msgKey) {
@@ -3773,71 +3784,259 @@ function ensureAiConsent(kind) {
   return ok;
 }
 
-async function onReceiptFile(file) {
-  if (!file) return;
-  if (!ensureAiConsent('receipt')) return;
-  let image;
-  try { image = await fileToBase64(file); } catch { alert(t('receiptFailed')); return; }
-  await scanReceiptImage(image);
+// ---------- 掃描流程:不管哪個環節出錯,都一定讓使用者知道,並可用同一張圖重試 ----------
+const SCAN_ATTEMPTS = 3;              // 一次請求最多試 3 次(網路錯誤 / 逾時 / 5xx)
+const SCAN_TIMEOUT_MS = 40000;        // 單次逾時:Worker 可能還要請 Opus 看第二次
+const SCAN_BACKOFF_MS = [1200, 3000];
+const SCAN_RESUME_GRACE_MS = 15000;   // 請求途中切到背景又回來:iOS 常讓請求卡死,最多再等這麼久就重送
+const SCAN_LOG_KEY = 'ra-scan-log';
+const SCAN_LOG_MAX = 30;
+const SCAN_DONE_KEY = 'ra-scan-done';
+const SCAN_DONE_MAX = 50;
+
+let scanSheetHeld = false;    // 面板正被掃描占用:掃描中、已填好等存檔、或使用者選了手動輸入
+let uploadBusy = false;       // 上傳照片辨識中
+const sheetWaiters = [];      // 等面板關閉的掃描
+const unlockWaiters = [];     // 等 App 鎖解開的提示
+
+const scanDelay = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function waitVisible() {
+  if (document.visibilityState === 'visible') return Promise.resolve();
+  return new Promise((resolve) => {
+    const check = () => {
+      if (document.visibilityState !== 'visible') return;
+      document.removeEventListener('visibilitychange', check);
+      clearInterval(timer);
+      resolve();
+    };
+    document.addEventListener('visibilitychange', check);
+    const timer = setInterval(check, 1000);   // 保險:事件沒送到也不會永遠卡住(背景時計時器本來就停著)
+  });
 }
 
-// 收據 / 付款截圖 → AI 讀出金額、商家、日期、分類,填進記帳面板。成功填入回傳 true。
-// 呼叫前要先 openSheet(),而且已取得 AI 同意。
-async function scanReceiptImage(image) {
+// 使用者真的看得到畫面:在前景,而且已解鎖。提示一律等到這時候才出現(鎖屏會蓋住 toast)
+async function waitAttention() {
+  for (;;) {
+    await waitVisible();
+    if (lockScreenEl.hidden) return;
+    await new Promise((r) => unlockWaiters.push(r));
+  }
+}
+
+// 面板被占用:上一筆掃描還沒處理完,或使用者正在輸入 / 編輯。空白的新面板不算(「開啟就記帳」)
+function sheetOccupied() {
+  if (uploadBusy) return true;
+  if (!sheetEl.classList.contains('open')) return false;
+  return scanSheetHeld || !!editingId || !!amountStr || !!selectedCatId || !!noteInput.value.trim();
+}
+
+function waitSheetFree() {
+  return new Promise((resolve) => {
+    const check = () => { if (sheetOccupied()) sheetWaiters.push(check); else resolve(); };
+    check();
+  });
+}
+
+// 本機診斷紀錄:只記時間、來源、階段、結果碼、次數、耗時。不含圖片、金額、商家
+function readScanLog() {
+  try { return JSON.parse(localStorage.getItem(SCAN_LOG_KEY)) || []; } catch { return []; }
+}
+const newScanDiag = (source) => ({ source, startedAt: Date.now(), attempts: 0 });
+function logScan(diag, stage, code = '') {
+  try {
+    const rows = readScanLog();
+    rows.push({ t: new Date().toISOString(), src: diag.source, stage, code: String(code), attempts: diag.attempts, ms: Date.now() - diag.startedAt });
+    localStorage.setItem(SCAN_LOG_KEY, JSON.stringify(rows.slice(-SCAN_LOG_MAX)));
+  } catch {}
+}
+
+async function copyScanLog() {
+  const head = `RichAuntie ${APP_MARKETING_VERSION} web ${WEB_BUILD} ${window.Capacitor?.getPlatform?.() || 'web'}`;
+  const text = [head, ...readScanLog().map((r) => JSON.stringify(r))].join('\n');
+  let copied = false;
+  try {
+    await navigator.clipboard.writeText(text);
+    copied = true;
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    try { copied = document.execCommand('copy'); } catch {}
+    ta.remove();
+  }
+  if (copied) showToast(t('scanLogCopied'));
+  else alert(text);   // 剪貼簿不能用:至少讓使用者看得到、可以截圖
+}
+
+// 跟 alertAfterLoader 同樣先收起 loading;另外等使用者看得到才跳
+async function scanDialog(show) {
+  await waitAttention();
+  hideLoader(true);
+  await scanDelay(260);
+  await waitAttention();
+  return show();
+}
+
+// 送一張圖給 Worker,自動重試網路錯誤 / 逾時 / 5xx。結果一律以回傳值表示,不丟連線類例外。
+// 回傳 { code: 'ok', data } | { code: 'quota', limit } | { code: 'rate', retryAfter } | { code: 'busy' } | { code: 'failed' }
+async function requestReceipt(image, diag) {
+  const body = JSON.stringify({
+    image,
+    mediaType: 'image/jpeg',
+    categories: aiCategoryLabels('expense'),
+    installId: getInstallId(),
+  });
+  let failures = 0;
+  while (failures < SCAN_ATTEMPTS) {
+    await waitVisible();
+    const ctrl = new AbortController();
+    let timedOut = false;
+    let wasHidden = false;
+    const abort = () => { timedOut = true; ctrl.abort(); };
+    let timer = setTimeout(abort, SCAN_TIMEOUT_MS);
+    const onVisibility = () => {
+      if (document.visibilityState !== 'visible') { wasHidden = true; return; }
+      if (wasHidden) { clearTimeout(timer); timer = setTimeout(abort, SCAN_RESUME_GRACE_MS); }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    let fail;
+    try {
+      const res = await fetch(RECEIPT_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: ctrl.signal,
+      });
+      let data = null;
+      try {
+        data = await res.json();
+      } catch (e) {
+        if (ctrl.signal.aborted) throw e;   // 讀 body 途中逾時 → 當網路問題重試
+      }
+      if (res.ok && data) return { code: 'ok', data };
+      if (res.status === 429 && data?.error === 'quota') return { code: 'quota', limit: data.limit };
+      if (res.status === 429) return { code: 'rate', retryAfter: data?.retryAfter };
+      if (res.status === 503 && data?.error === 'global') return { code: 'busy' };
+      if (res.ok || res.status >= 500) fail = res.ok ? 'bad_json' : 'http_' + res.status;
+      else { logScan(diag, 'attempt', 'http_' + res.status); return { code: 'failed' }; }   // 其他 4xx 重試也一樣
+    } catch {
+      fail = timedOut ? 'timeout' : 'network';
+    } finally {
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    }
+    // 在背景中失敗的不算次數(iOS 切 App 時請求常被直接砍掉),回到前景再重送
+    const hidden = wasHidden || document.visibilityState !== 'visible';
+    if (!hidden) { diag.attempts += 1; failures += 1; }
+    logScan(diag, hidden ? 'attempt_hidden' : 'attempt', fail);
+    if (!hidden && failures < SCAN_ATTEMPTS) await scanDelay(SCAN_BACKOFF_MS[failures - 1]);
+  }
+  return { code: 'failed' };
+}
+
+// 只有讀到金額才動面板:不會有商家 / 日期填了、金額卻是空的
+function applyScanResult(r) {
+  // 收據一律是支出;付款 App 截圖(TNG 收款、轉入)可能是收入
+  const isIn = r.direction === 'in';
+  setSheetType(isIn ? 'income' : 'expense');
+  amountStr = String(Math.round(r.amount * 100) / 100);
+  renderAmount();
+  if (r.merchant) noteInput.value = String(r.merchant).slice(0, 60);
+  if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) { dateInput.value = r.date; renderDateChips(); }
+  if (!isIn) {
+    const match = findCatByAiName(r.category, 'expense');
+    if (match) selectedCatId = match.id;
+  }
+  renderCategoryChips();
+  updateSaveState();
+}
+
+// 辨識一張圖並把結果告訴使用者(面板要先開好、AI 同意要先取得)。
+// 回傳結果碼:filled / gave_up / blank / quota / rate / busy。沒有「什麼都沒發生」這種結果。
+async function runScanFlow(image, diag, loaderKey) {
   const btn = $('#receipt-btn');
   const label = btn.querySelector('.receipt-label');
   const original = label.textContent;
   btn.disabled = true;
   btn.classList.add('busy');
   label.textContent = t('scanningReceipt');
-  showLoader('loaderReceipt');
   try {
-    const names = aiCategoryLabels('expense');
-    const res = await fetch(RECEIPT_ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        image,
-        mediaType: 'image/jpeg',
-        categories: names,
-        installId: getInstallId(),
-      }),
-    });
-    if (!res.ok) {
-      let e = {};
-      try { e = await res.json(); } catch {}
-      if (res.status === 429 && e.error === 'quota') await alertAfterLoader(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', e.limit ?? 5));
-      else if (res.status === 429) await alertAfterLoader(rateMsg(e.retryAfter));
-      else if (res.status === 503) await alertAfterLoader(t('receiptBusy'));
-      else await alertAfterLoader(t('receiptFailed'));
-      return false;
+    for (;;) {
+      let res;
+      showLoader(loaderKey);
+      try {
+        res = await requestReceipt(image, diag);
+        if (res.code === 'ok') {
+          const r = res.data;
+          if (typeof r.amount === 'number' && r.amount > 0) {
+            applyScanResult(r);
+            return 'filled';
+          }
+          res = { code: r.status === 'blank_or_blocked' ? 'blank' : r.status === 'not_a_payment' ? 'not_a_payment' : 'no_amount' };
+        }
+      } catch (e) {
+        logScan(diag, 'exception', e?.name || 'error');
+        res = { code: 'failed' };
+      } finally {
+        hideLoader();
+      }
+      logScan(diag, 'result', res.code);
+      if (res.code === 'quota') {
+        await scanDialog(() => alert(IS_NATIVE ? t('receiptQuotaNative') : t('receiptQuota', res.limit ?? 5)));
+        return 'quota';
+      }
+      if (res.code === 'rate') {
+        await scanDialog(() => alert(rateMsg(res.retryAfter)));
+        return 'rate';
+      }
+      if (res.code === 'busy') {
+        await scanDialog(() => alert(t('receiptBusy')));
+        return 'busy';
+      }
+      if (res.code === 'blank') {
+        await scanDialog(() => alert(t('scanBlank')));   // 重試也是黑的,不問
+        return 'blank';
+      }
+      const again = await scanDialog(() => confirm(t(res.code === 'not_a_payment' ? 'scanRetryNoPayment' : 'scanRetryGeneric')));
+      if (!again) return 'gave_up';
+      logScan(diag, 'user_retry');
     }
-    const r = await res.json();
-
-    // 收據一律是支出;付款 App 截圖(TNG 收款、轉入)可能是收入
-    const isIn = r.direction === 'in';
-    setSheetType(isIn ? 'income' : 'expense');
-    if (typeof r.amount === 'number' && r.amount > 0) {
-      amountStr = String(Math.round(r.amount * 100) / 100);
-      renderAmount();
-    }
-    if (r.merchant) noteInput.value = String(r.merchant).slice(0, 60);
-    if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) { dateInput.value = r.date; renderDateChips(); }
-    if (!isIn) {
-      const match = findCatByAiName(r.category, 'expense');
-      if (match) selectedCatId = match.id;
-    }
-    renderCategoryChips();
-    updateSaveState();
-    return typeof r.amount === 'number' && r.amount > 0;
-  } catch {
-    await alertAfterLoader(t('receiptFailed'));
-    return false;
   } finally {
-    hideLoader();
     btn.disabled = false;
     btn.classList.remove('busy');
     label.textContent = original;
+  }
+}
+
+async function onReceiptFile(file) {
+  if (!file) return;
+  const diag = newScanDiag('upload');
+  logScan(diag, 'start');
+  if (!ensureAiConsent('receipt')) {
+    logScan(diag, 'done', 'consent_declined');
+    showToast(t('scanCancelled'));
+    return;
+  }
+  let image;
+  try {
+    image = await fileToBase64(file, 1800, 0.8);
+  } catch {
+    logScan(diag, 'done', 'bad_image');
+    await scanDialog(() => alert(t('receiptFailed')));
+    return;
+  }
+  uploadBusy = true;
+  scanSheetHeld = true;
+  try {
+    const outcome = await runScanFlow(image, diag, 'loaderReceipt');
+    logScan(diag, 'done', outcome);
+  } catch (e) {
+    logScan(diag, 'done', 'exception');
+    await scanDialog(() => alert(t('receiptFailed')));
+  } finally {
+    uploadBusy = false;
   }
 }
 
@@ -4755,29 +4954,106 @@ async function raApplePay(b64) {
 // 背面輕點 → 捷徑「截圖」→「Log Expense from Screenshot」:原生把 JPEG base64 丟進來
 const AUTO_SAVE_SCAN_KEY = 'ra-scan-autosave';
 const autoSaveScans = () => { try { return localStorage.getItem(AUTO_SAVE_SCAN_KEY) === '1'; } catch { return false; } };
-let scanBusy = false;
-
-const raScan = async (b64) => {
-  if (scanBusy || typeof b64 !== 'string' || !b64) return;
-  scanBusy = true;
+// 已結案的截圖 id(存檔 / 放棄…)。原生那邊沒收到回覆、下次又送同一張時不會重掃或重複記帳。
+// 只填好還沒存的不記:若 App 被殺,面板已經不見,重掃才對。
+function scanAlreadyDone(id) {
+  try { return (JSON.parse(localStorage.getItem(SCAN_DONE_KEY)) || []).includes(id); } catch { return false; }
+}
+function rememberScanDone(id) {
+  if (!id) return;
   try {
-    quickAdd();
-    if (!ensureAiConsent('receipt')) return;
-    showLoader('loaderScreenshot');
-    $('#al-text').textContent = t('loaderScreenshot');
-    const ok = await scanReceiptImage(b64).finally(() => hideLoader());
-    if (!ok || !autoSaveScans()) return;
-    // 自動存檔:AI 沒給分類就放「Other」,金額一定要有
-    if (!selectedCatId) {
-      const fallback = categories.find((c) => c.id === (sheetType === 'income' ? 'other-income' : 'other'))
-        || catsOfType(sheetType)[0];
-      if (fallback) selectedCatId = fallback.id;
-    }
-    if (toCents(amountStr) > 0 && selectedCatId) await onSave();
-  } finally {
-    scanBusy = false;
+    const ids = JSON.parse(localStorage.getItem(SCAN_DONE_KEY)) || [];
+    ids.push(id);
+    localStorage.setItem(SCAN_DONE_KEY, JSON.stringify(ids.slice(-SCAN_DONE_MAX)));
+  } catch {}
+}
+
+// 開面板 → AI 同意 → 辨識 → (可選)自動存檔。回傳結果碼。
+async function scanIntoSheet(id, b64, diag) {
+  await waitVisible();
+  while (sheetOccupied()) {
+    // 不蓋掉上一筆填好的面板,也不蓋掉使用者正在輸入的內容
+    logScan(diag, 'wait_sheet');
+    if (lockScreenEl.hidden) showToast(t('scanQueued'));
+    await waitSheetFree();
+    await scanDelay(350);
+    await waitVisible();
   }
-};
+  quickAdd();
+  scanSheetHeld = true;
+  if (localStorage.getItem('aiConsent:receipt') !== '1') await waitAttention();   // 同意視窗不跳在鎖屏上
+  if (!ensureAiConsent('receipt')) {
+    await waitAttention();
+    showToast(t('scanCancelled'));
+    return 'consent_declined';
+  }
+  const outcome = await runScanFlow(b64, diag, 'loaderScreenshot');
+  if (outcome !== 'filled' || !autoSaveScans()) return outcome;
+  // 自動存檔:AI 沒給分類就放「Other」,金額一定要有
+  if (!selectedCatId) {
+    const fallback = categories.find((c) => c.id === (sheetType === 'income' ? 'other-income' : 'other'))
+      || catsOfType(sheetType)[0];
+    if (fallback) selectedCatId = fallback.id;
+  }
+  const cents = toCents(amountStr);
+  if (!(cents > 0 && selectedCatId)) return outcome;
+  const shop = noteInput.value.trim();
+  await onSave();
+  rememberScanDone(id);
+  await waitAttention();
+  showToast(t('scanSavedToast', formatRM(cents), shop));
+  return 'saved';
+}
+
+async function runScanJob(id, b64) {
+  const diag = newScanDiag('tap');
+  logScan(diag, 'start');
+  for (;;) {
+    let outcome;
+    try {
+      outcome = await scanIntoSheet(id, b64, diag);
+    } catch (e) {
+      // 任何沒料到的例外(quickAdd、存檔…)都走同一個重試提示,絕不安靜消失
+      logScan(diag, 'exception', e?.name || 'error');
+      const again = await scanDialog(() => confirm(t('scanRetryGeneric')));
+      if (again) {
+        if (scanSheetHeld) closeSheet();
+        logScan(diag, 'user_retry');
+        continue;
+      }
+      outcome = 'gave_up';
+    }
+    logScan(diag, 'done', outcome);
+    if (outcome !== 'filled') rememberScanDone(id);
+    await waitAttention();   // 使用者看得到結果才算數,原生這時才刪掉存好的截圖
+    return { ok: true, outcome };
+  }
+}
+
+// 原生 / 背面輕點的入口:window.__raScan(id, b64),回傳 Promise,結案才 resolve。
+// 同一個 id 重送(回前景時原生會再送一次)拿到同一個 Promise,不會掃第二次;沒帶 id 的舊呼叫法也接受。
+const scanJobs = new Map();
+let scanChain = Promise.resolve();
+
+function raScan(id, b64) {
+  if (b64 === undefined) { b64 = id; id = null; }
+  if (typeof b64 !== 'string' || !b64) return Promise.resolve({ ok: false, outcome: 'bad_input' });
+  if (id && scanJobs.has(id)) return scanJobs.get(id);
+  if (id && scanAlreadyDone(id)) return Promise.resolve({ ok: true, outcome: 'already_done' });
+  // 一次處理一筆:下一筆等上一筆結案、面板關閉後才開始
+  const job = scanChain
+    .then(() => runScanJob(id, b64))
+    .catch((e) => {
+      logScan(newScanDiag('tap'), 'internal', e?.name || 'error');
+      return { ok: false, outcome: 'internal' };   // 原生保留檔案,稍後重送
+    });
+  scanChain = job;
+  if (id) {
+    scanJobs.set(id, job);
+    if (scanJobs.size > SCAN_DONE_MAX) scanJobs.delete(scanJobs.keys().next().value);
+  }
+  return job;
+}
 
 // 用戶在自己 iPhone 做好捷徑 → 分享 → 拷貝 iCloud 連結,貼在這裡就變成一鍵加入。
 // 空字串時退回手動教學 + 打開捷徑 App。
@@ -4923,6 +5199,17 @@ function renderApplePaySetup(page) {
     });
 }
 
+function scanLogRow() {
+  const row = document.createElement('button');
+  row.type = 'button';
+  row.className = 'cat-row';
+  row.id = 'scan-log-row';
+  row.innerHTML = `<span class="cat-row-name"></span>`;
+  row.querySelector('.cat-row-name').textContent = t('scanLogCopy');
+  row.addEventListener('click', copyScanLog);
+  return row;
+}
+
 function renderQuickAddPage() {
   const page = $('#quickadd-body');
   const platform = window.Capacitor?.getPlatform?.() || 'web';
@@ -4940,6 +5227,7 @@ function renderQuickAddPage() {
     cb.checked = autoSaveScans();
     cb.addEventListener('change', () => lsSet(AUTO_SAVE_SCAN_KEY, cb.checked ? '1' : '0'));
     list.appendChild(row);
+    list.appendChild(scanLogRow());
     page.appendChild(list);
     const foot = document.createElement('p');
     foot.className = 'backup-hint';
@@ -4996,6 +5284,7 @@ function renderQuickAddPage() {
     });
     list.appendChild(copy);
   }
+  list.appendChild(scanLogRow());
   page.appendChild(list);
   const hint = document.createElement('p');
   hint.className = 'backup-hint';
