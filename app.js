@@ -469,7 +469,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 26;
+const WEB_BUILD = 27;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -3786,7 +3786,7 @@ function ensureAiConsent(kind) {
 
 // ---------- 掃描流程:不管哪個環節出錯,都一定讓使用者知道,並可用同一張圖重試 ----------
 const SCAN_ATTEMPTS = 3;              // 一次請求最多試 3 次(網路錯誤 / 逾時 / 5xx)
-const SCAN_TIMEOUT_MS = 40000;        // 單次逾時:Worker 可能還要請 Opus 看第二次
+const SCAN_TIMEOUT_MS = 60000;        // 單次逾時:比 Worker 最壞情況(約 45 秒,Haiku 重試 + Opus)長,不會趕在它算完前重送
 const SCAN_BACKOFF_MS = [1200, 3000];
 const SCAN_RESUME_GRACE_MS = 15000;   // 請求途中切到背景又回來:iOS 常讓請求卡死,最多再等這麼久就重送
 const SCAN_LOG_KEY = 'ra-scan-log';
@@ -3842,7 +3842,8 @@ function waitSheetFree() {
 function readScanLog() {
   try { return JSON.parse(localStorage.getItem(SCAN_LOG_KEY)) || []; } catch { return []; }
 }
-const newScanDiag = (source) => ({ source, startedAt: Date.now(), attempts: 0 });
+// scanKey:同一張圖的所有重試共用,Worker 靠它只扣一次額度
+const newScanDiag = (source) => ({ source, startedAt: Date.now(), attempts: 0, scanKey: crypto.randomUUID() });
 function logScan(diag, stage, code = '') {
   try {
     const rows = readScanLog();
@@ -3887,6 +3888,7 @@ async function requestReceipt(image, diag) {
     mediaType: 'image/jpeg',
     categories: aiCategoryLabels('expense'),
     installId: getInstallId(),
+    scanKey: diag.scanKey,
   });
   let failures = 0;
   while (failures < SCAN_ATTEMPTS) {
