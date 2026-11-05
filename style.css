@@ -1,5 +1,10 @@
 /* RichAuntie — 香檳絲綢主題(取色自 App 圖示:絲綢、金幣、酒紅指甲) */
 :root {
+  /* 左右安全區:App 欄位(最寬 480px、置中)落在安全區外的寬度。
+     有些機型感測器島和狀態列在右上角直排(iPhone Duo 直向實測 top 0、right 84px),只讓 top 會被蓋住。
+     一般 iPhone 直向左右都是 0;橫向時欄位離邊夠遠,也算出 0,版面不變 */
+  --inset-l: max(0px, env(safe-area-inset-left, 0px) - max(0px, (100vw - 480px) / 2));
+  --inset-r: max(0px, env(safe-area-inset-right, 0px) - max(0px, (100vw - 480px) / 2));
   --bg: #EDE4D5;
   --surface: #F8F3EA;
   --surface-2: #E4D9C6;
@@ -83,6 +88,8 @@ body {
   margin: 0 auto;
   min-height: 100dvh;
   padding-bottom: 120px;
+  padding-left: var(--inset-l);
+  padding-right: var(--inset-r);
 }
 
 .num { font-variant-numeric: tabular-nums; }
@@ -334,7 +341,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   display: flex;
   align-items: stretch;
   justify-content: space-around;
-  padding: 6px 10px calc(env(safe-area-inset-bottom) + 8px);
+  padding: 6px calc(10px + var(--inset-r)) calc(env(safe-area-inset-bottom) + 8px) calc(10px + var(--inset-l));
   background: var(--blur-bar);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -403,13 +410,16 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   width: min(480px, 100%);
   background: var(--surface);
   border-radius: 20px 20px 0 0;
-  padding: 6px 18px calc(env(safe-area-inset-bottom) + 14px);
-  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+  padding: 6px calc(18px + var(--inset-r)) calc(env(safe-area-inset-bottom) + 14px) calc(18px + var(--inset-l));
+  max-height: 100dvh;   /* 內容比螢幕高時不能往上長出畫面(頂端的取消鍵會點不到) */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   transform: translate(-50%, 105%);
   transition: transform 0.36s var(--spring);
 }
 
-.sheet.open { transform: translate(-50%, 0); }
+/* 陰影只在打開時才有:關著的面板就在螢幕正下方,陰影會往上漏成一條深色帶 */
+.sheet.open { transform: translate(-50%, 0); box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5); }
 
 .cat-editor { z-index: 33; }
 
@@ -624,7 +634,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   width: min(480px, 100%);
   height: 100dvh;
   background: var(--bg);
-  padding: calc(env(safe-area-inset-top) + 6px) 16px 20px;
+  padding: calc(env(safe-area-inset-top) + 6px) calc(16px + var(--inset-r)) 20px calc(16px + var(--inset-l));
   overflow-y: auto;
   transform: translate(-50%, 100%);
   transition: transform 0.4s var(--spring);
@@ -1084,6 +1094,7 @@ body[data-lang="en"] .summary-caption { letter-spacing: 0.3px; }
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0 var(--inset-r) 0 var(--inset-l);
 }
 
 .lock-inner {
@@ -1429,12 +1440,25 @@ body.has-ad .tab-bar {
   padding-bottom: 8px;
 }
 
+/* 橫幅的寬度只到安全區(iPhone Duo 比螢幕窄),周圍和下方要有底,捲動中的內容才不會從旁邊露出來 */
+body.has-ad::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 14;
+  height: calc(env(safe-area-inset-bottom) + var(--ad-h, 0px));
+  background: var(--bg);
+}
+
 /* 底部面板與全螢幕頁面:最底下的按鈕(例如記帳的「儲存」)不能被橫幅蓋住 */
 body.has-ad .sheet {
   padding-bottom: calc(env(safe-area-inset-bottom) + var(--ad-h, 0px) + 14px);
 }
 body.has-ad .modal {
-  padding-bottom: calc(20px + var(--ad-h, 0px));
+  padding-bottom: calc(env(safe-area-inset-bottom) + 20px + var(--ad-h, 0px));
+  clip-path: inset(0 0 calc(env(safe-area-inset-bottom) + var(--ad-h, 0px)) 0);   /* 全螢幕頁面捲動時內容也不從橫幅旁邊露出來 */
 }
 
 /* ---------- 快速記帳設定頁 ---------- */
@@ -1725,7 +1749,10 @@ body.has-ad .modal {
 #sheet .subcat-row { flex-wrap: wrap; overflow: visible; row-gap: 6px; }
 
 /* 一屏放得下(iPhone 15 含安全區):壓縮記帳面板的垂直間距 */
-#sheet { padding-top: 4px; }
+#sheet { padding-top: 4px; display: flex; flex-direction: column; }
+#sheet > * { flex-shrink: 0; }
+/* 螢幕放不下時只有中段捲動:標題、金額、鍵盤、儲存永遠看得到。放得下時跟沒有這層一樣;橫向連這樣都放不下,就整個面板捲動 */
+#sheet > .sheet-scroll { flex: 0 1 auto; min-height: 96px; margin: 0 -18px; padding: 0 18px; overflow-y: auto; overscroll-behavior: contain; }
 #sheet .grabber { margin-bottom: 4px; }
 #sheet #amount-text { font-size: 42px; min-height: 46px; line-height: 46px; }
 #sheet .amount-display { padding: 2px 4px 8px; margin-bottom: 6px; }
@@ -1743,6 +1770,7 @@ body.has-ad .modal {
 #sheet .key { padding: 7px 0; font-size: 23px; }
 #sheet .keypad { gap: 5px; margin-bottom: 8px; }
 #sheet .save-btn { padding: 13px; }
+@media (max-height: 740px) { #sheet .key { min-height: 44px; } }   /* 矮螢幕把高度讓給中段,一般 iPhone 不受影響 */
 
 /* Trends:進行中的月份 */
 .tt-progress { display: block; font-size: 10.5px; color: var(--text-2); font-weight: 500; margin-top: 1px; }
@@ -1900,10 +1928,10 @@ body.has-ad .modal {
 /* ---------- Apple Pay 自動記帳 ---------- */
 .ap-section { margin-top: 26px; }
 .ra-toast {
-  position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 12px); z-index: 95;
+  position: fixed; left: calc(50% + (var(--inset-l) - var(--inset-r)) / 2); top: calc(env(safe-area-inset-top) + 12px); z-index: 95;
   /* 收起時要整個離開畫面:提示可能不只兩行。left: 50% 會把可用寬度壓成一半,所以要 max-content */
   transform: translate(-50%, calc(-100% - env(safe-area-inset-top) - 24px));
-  width: max-content; max-width: min(92vw, 420px);
+  width: max-content; max-width: min(92vw - var(--inset-l) - var(--inset-r), 420px);
   padding: 11px 16px; border-radius: 14px; font-size: 14px; font-weight: 600; line-height: 1.35;
   background: var(--text); color: var(--bg); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
   transition: transform 0.3s var(--spring, ease); pointer-events: none;

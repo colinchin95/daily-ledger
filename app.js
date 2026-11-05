@@ -346,6 +346,7 @@ const STRINGS = {
     scanCancelled: 'Scan cancelled. You can enter this one manually.',
     scanSavedToast: (amt, shop) => `Rich Auntie saved ${amt}${shop ? ' at ' + shop : ''}`,
     scanQueued: 'Rich Auntie has your screenshot. She will read it once you close this entry.',
+    scanCheckDate: "Rich Auntie isn't sure about this date. Please check it before saving.",
     scanLogCopy: 'Copy scan log',
     scanLogCopied: 'Scan log copied. Paste it to us in your message.',
     receiptSection: 'Receipt scanning',
@@ -469,7 +470,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 27;
+const WEB_BUILD = 28;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -1954,7 +1955,9 @@ function renderDateChips() {
   const v = dateInput.value || todayStr();
   const y = new Date(); y.setDate(y.getDate() - 1);
   const yStr = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
-  $('#date-chip-label').textContent = v === todayStr() ? t('today') : v === yStr ? t('yesterday') : shortDate(v);
+  // 不是今年就顯示年份:AI 編出舊年份時,用戶才看得出來
+  const otherYear = v.slice(0, 4) !== todayStr().slice(0, 4);
+  $('#date-chip-label').textContent = v === todayStr() ? t('today') : v === yStr ? t('yesterday') : otherYear ? `${shortDate(v)} ${v.slice(0, 4)}` : shortDate(v);
   const quick = $('#date-quick');
   const toYesterday = v === todayStr();
   quick.textContent = toYesterday ? t('yesterday') : t('today');
@@ -1989,6 +1992,7 @@ function openSheet(entry = null) {
   renderAccountChips();
   noteInput.value = entry?.note ?? '';
   dateInput.value = entry?.date ?? todayStr();
+  $('#sheet-scroll').scrollTop = 0;
   deleteBtn.hidden = !entry;
   setFixedOn(entry ? isFixed(entry) : false);
 
@@ -3938,6 +3942,26 @@ async function requestReceipt(image, diag) {
   return { code: 'failed' };
 }
 
+// AI 看不清楚時會自己編日期。未來或超過 30 天前算可疑;「今天」和全 App 一樣用 todayStr
+const SCAN_DATE_MAX_AGE_DAYS = 30;
+let scanDateOdd = false;   // 剛填進面板的日期可疑
+function scanDateSuspicious(date) {
+  const oldest = new Date();
+  oldest.setDate(oldest.getDate() - SCAN_DATE_MAX_AGE_DAYS);
+  return date > todayStr() || date < ymd(oldest);
+}
+
+// 日期可疑:提醒一次,回傳 true 表示不能自動存檔。日期留在欄位裡,舊收據可能是故意上傳的
+async function warnScanDate(diag) {
+  if (!scanDateOdd) return false;
+  logScan(diag, 'date_suspect');
+  const scroller = $('#sheet-scroll');
+  scroller.scrollTop = scroller.scrollHeight;   // 矮螢幕上日期可能捲在下面,要看得到才能檢查
+  await waitAttention();
+  showToast(t('scanCheckDate'));
+  return true;
+}
+
 // 只有讀到金額才動面板:不會有商家 / 日期填了、金額卻是空的
 function applyScanResult(r) {
   // 收據一律是支出;付款 App 截圖(TNG 收款、轉入)可能是收入
@@ -3946,7 +3970,14 @@ function applyScanResult(r) {
   amountStr = String(Math.round(r.amount * 100) / 100);
   renderAmount();
   if (r.merchant) noteInput.value = String(r.merchant).slice(0, 60);
-  if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) { dateInput.value = r.date; renderDateChips(); }
+  scanDateOdd = false;
+  if (typeof r.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(r.date)) {
+    dateInput.value = r.date;   // 不存在的日期(02-31)瀏覽器會清成空字串,畫面和存檔都當今天
+    scanDateOdd = !!dateInput.value && scanDateSuspicious(dateInput.value);
+  } else if (!editingId) {
+    dateInput.value = todayStr();   // 沒讀到日期:不留同一面板上一次掃描的日期(編輯舊紀錄則保留)
+  }
+  renderDateChips();
   if (!isIn) {
     const match = findCatByAiName(r.category, 'expense');
     if (match) selectedCatId = match.id;
@@ -4033,6 +4064,7 @@ async function onReceiptFile(file) {
   scanSheetHeld = true;
   try {
     const outcome = await runScanFlow(image, diag, 'loaderReceipt');
+    if (outcome === 'filled') await warnScanDate(diag);
     logScan(diag, 'done', outcome);
   } catch (e) {
     logScan(diag, 'done', 'exception');
@@ -4976,7 +5008,7 @@ async function scanIntoSheet(id, b64, diag) {
   while (sheetOccupied()) {
     // 不蓋掉上一筆填好的面板,也不蓋掉使用者正在輸入的內容
     logScan(diag, 'wait_sheet');
-    if (lockScreenEl.hidden) showToast(t('scanQueued'));
+    if (lockScreenEl.hidden && !$('#ra-toast')?.classList.contains('show')) showToast(t('scanQueued'));   // 不蓋掉還在顯示的提示(例如檢查日期)
     await waitSheetFree();
     await scanDelay(350);
     await waitVisible();
@@ -4990,7 +5022,7 @@ async function scanIntoSheet(id, b64, diag) {
     return 'consent_declined';
   }
   const outcome = await runScanFlow(b64, diag, 'loaderScreenshot');
-  if (outcome !== 'filled' || !autoSaveScans()) return outcome;
+  if (outcome !== 'filled' || (await warnScanDate(diag)) || !autoSaveScans()) return outcome;
   // 自動存檔:AI 沒給分類就放「Other」,金額一定要有
   if (!selectedCatId) {
     const fallback = categories.find((c) => c.id === (sheetType === 'income' ? 'other-income' : 'other'))
