@@ -470,7 +470,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 28;
+const WEB_BUILD = 29;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -5327,6 +5327,30 @@ function renderQuickAddPage() {
 }
 
 // ---------- 啟動 ----------
+// 啟動計時:超過 3 秒(或出錯、靠 15 秒保險收起)才寫進掃描紀錄,Copy scan log 就看得到卡在哪一步。
+// ms 從頁面開始載入算起;code 記當下 visibilityState(背景啟動時計時器會被放慢)。
+const BOOT_SLOW_MS = 3000;
+const bootMarks = [];
+let bootLogged = 0;
+function bootMark(stage) {
+  bootMarks.push({ stage, at: Date.now(), vis: document.visibilityState });
+}
+function flushBootLog() {
+  const done = bootMarks[bootMarks.length - 1];
+  const slow = done && done.at - performance.timeOrigin >= BOOT_SLOW_MS;
+  if (!bootLogged && !slow && done?.stage === 'ready') return;
+  try {
+    const rows = readScanLog();
+    for (const m of bootMarks.slice(bootLogged)) {
+      rows.push({ t: new Date(m.at).toISOString(), src: 'boot', stage: m.stage, code: m.vis, attempts: 0, ms: Math.round(m.at - performance.timeOrigin) });
+    }
+    bootLogged = bootMarks.length;
+    localStorage.setItem(SCAN_LOG_KEY, JSON.stringify(rows.slice(-SCAN_LOG_MAX)));
+  } catch {}
+}
+const bootStep = (stage, p) => p.then((v) => { bootMark(stage); return v; });
+bootMark('script');
+
 async function init() {
   buildFormatters();
   applyLanguage();
@@ -5337,15 +5361,19 @@ async function init() {
   if (pinIsSet()) showLock('unlock');
 
   [entries, categories, meta, recurring, accounts] = await Promise.all([
-    getEntries(), getCategories(), getMeta(), getRecurring(), getAccounts(),
+    bootStep('entries', getEntries()), bootStep('categories', getCategories()), bootStep('meta', getMeta()),
+    bootStep('recurring', getRecurring()), bootStep('accounts', getAccounts()),
   ]);
   await materializeRecurring();   // 補當月固定支出
+  bootMark('recurring_done');
   renderList();
   switchView('report');           // 預設開在「報表」頁
   maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
   maybeShowBackupBanner();        // 太久沒備份就提醒
   maybeShowBacktapBanner();       // iOS:引導設定背面輕點記帳
   hideLoader(true);               // 啟動動畫收起(資料已載入)
+  bootMark('ready');
+  flushBootLog();
   initQuickAdd();                 // 背面輕點 / 捷徑 / 長按圖示 → 直接記帳
 
   // PWA:註冊 service worker(需要 https 或 localhost)。
@@ -5359,6 +5387,11 @@ async function init() {
   checkEntitlement();  // 查詢 Pro 狀態
 }
 
-init();
+init().catch((e) => { bootMark(`error:${e?.name || 'error'}`); flushBootLog(); });
 // 保險:啟動出錯也不要讓 loading 一直蓋著畫面
-setTimeout(() => { if ($('#auntie-loader').classList.contains('boot')) hideLoader(true); }, 15000);
+setTimeout(() => {
+  if (!$('#auntie-loader').classList.contains('boot')) return;
+  hideLoader(true);
+  bootMark('fallback_15s');
+  flushBootLog();
+}, 15000);
