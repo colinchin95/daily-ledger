@@ -6,15 +6,18 @@ import { get as idbGet, set as idbSet } from './lib/idb-keyval.js';
 // 1.5 秒還沒開好就再開一次,誰先開好用誰;四次都失敗才算失敗。
 const OPEN_RETRY_MS = 1500;
 const OPEN_MAX_TRIES = 4;
-export const dbStats = { tries: 0 };
+const OP_TIMEOUT_MS = 4000;
+export const dbStats = { tries: 0, reconnects: 0 };
 let dbPromise;
 function openDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     let settled = false;
+    let tries = 0;
     let failed = 0;
     let timer;
     const attempt = () => {
+      tries += 1;
       dbStats.tries += 1;
       const req = indexedDB.open('keyval-store');
       req.onupgradeneeded = () => req.result.createObjectStore('keyval');
@@ -23,22 +26,46 @@ function openDB() {
         settled = true;
         clearTimeout(timer);
         const db = req.result;
-        db.onclose = () => { dbPromise = undefined; };
+        db.onclose = () => { if (dbPromise === mine) dbPromise = undefined; };
         resolve(db);
       };
       req.onerror = () => {
         failed += 1;
         if (failed === OPEN_MAX_TRIES && !settled) { settled = true; reject(req.error); }
       };
-      if (dbStats.tries < OPEN_MAX_TRIES) timer = setTimeout(() => { if (!settled) attempt(); }, OPEN_RETRY_MS);
+      if (tries < OPEN_MAX_TRIES) timer = setTimeout(() => { if (!settled) attempt(); }, OPEN_RETRY_MS);
     };
     attempt();
   });
-  dbPromise.catch(() => { dbPromise = undefined; });
-  return dbPromise;
+  const mine = dbPromise;
+  mine.catch(() => { if (dbPromise === mine) dbPromise = undefined; });
+  return mine;
+}
+
+// iOS 把 App 放到背景後,資料庫連線可能斷掉(之後的交易直接丟錯)或卡住不回應。
+// 出錯或 4 秒沒完成:丟掉舊連線重開,再做一次。寫入是整個 key 覆蓋,重做一次不會重複。
+function withTimeout(p, ms) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(Object.assign(new Error('db_timeout'), { code: 'db_timeout' })), ms);
+  });
+  return Promise.race([p, timeout]).finally(() => clearTimeout(timer));
+}
+async function store(mode, fn) {
+  for (let i = 0; ; i++) {
+    const conn = openDB();
+    try {
+      const db = await conn;
+      return await withTimeout(fn(db.transaction('keyval', mode).objectStore('keyval')), OP_TIMEOUT_MS);
+    } catch (e) {
+      if (i >= 1) throw e;
+      dbStats.reconnects += 1;
+      if (dbPromise === conn) dbPromise = undefined;
+      conn.then((db) => db.close(), () => {});
+    }
+  }
 }
 // 跟 idb-keyval 預設 store 同一個資料庫 / 表,舊資料照樣讀得到
-const store = (mode, fn) => openDB().then((db) => fn(db.transaction('keyval', mode).objectStore('keyval')));
 const get = (key) => idbGet(key, store);
 const set = (key, value) => idbSet(key, value, store);
 

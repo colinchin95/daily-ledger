@@ -323,6 +323,7 @@ const STRINGS = {
     reconMissing: 'Missing',
     reconCredit: 'Refund',
     reconAdd: 'Add',
+    saveFailed: "Couldn't save just now. Please close and reopen RichAuntie, then try again.",
     reconAddAll: (n) => `Add ${n}`,
     reconSummary: (total, matched, add) => `${total} transactions · ${matched} recorded · ${add} to add`,
     reconOtherCard: (n) => `${n} more not on this card`,
@@ -469,8 +470,8 @@ let currency = (() => {
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
-const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 30;
+const APP_MARKETING_VERSION = '1.5.3';
+const WEB_BUILD = 31;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -4081,8 +4082,19 @@ const REVENUECAT_IOS_KEY = 'appl_RUMkTHZXFfjCiraVUjeqZcEQSSA';
 const REVENUECAT_ANDROID_KEY = 'goog_PQVyVvEOPkdjQOnLjtghnxBOohA';
 const REVENUECAT_KEY = (window.Capacitor?.getPlatform?.() === 'android')
   ? REVENUECAT_ANDROID_KEY : REVENUECAT_IOS_KEY;
-let isPro = false;
-let proUntil = null;
+// 上次確認的 Pro 狀態:開 App、離線或查詢還沒回來時先用它,Pro 用戶才不會先看到廣告
+const PRO_CACHE_KEY = 'proCache';
+function readProCache() {
+  try {
+    const c = JSON.parse(localStorage.getItem(PRO_CACHE_KEY));
+    if (c?.pro && (!c.until || c.until * 1000 > Date.now())) return c;
+  } catch {}
+  return null;
+}
+const cachedPro = readProCache();
+let isPro = !!cachedPro;
+let proUntil = cachedPro?.until ?? null;
+let proChecked = false;   // 這次開 App 已經確認過訂閱狀態;確認前不放廣告
 let proPriceStr = null; // 原生 paywall 顯示的在地化價格（如 RM19.90）
 
 // 懶載入 IAP shim（只在 iOS 殼層、且只載一次）。Web 永不觸發。
@@ -4117,6 +4129,7 @@ const ADS_ENABLED = true;
 
 async function syncAds() {
   if (!ADS_ENABLED || !IS_NATIVE) return;
+  if (!isPro && !proChecked) return;
   try {
     if (isPro) {
       if (_adsMod) await _adsMod.stopAds();
@@ -4140,6 +4153,7 @@ const planUnit = () => t('unitSixMonths');
 
 let lastIconPro = false;
 function updateProUI() {
+  try { localStorage.setItem(PRO_CACHE_KEY, JSON.stringify({ pro: isPro, until: proUntil })); } catch {}
   const label = $('#pro-label');
   const status = $('#pro-status');
   const hint = $('#pro-hint');
@@ -4234,6 +4248,7 @@ async function checkEntitlement() {
       const s = await m.getProStatus();
       isPro = !!s.pro;
       proUntil = s.until || null;
+      proChecked = true;
       updateProUI();
     } catch {
       /* 離線或尚未設定金鑰:維持現狀 */
@@ -4248,6 +4263,7 @@ async function checkEntitlement() {
     const d = await r.json();
     isPro = !!d.pro;
     proUntil = d.until || null;
+    proChecked = true;
     updateProUI();
   } catch {
     /* 離線:維持現狀 */
@@ -4471,19 +4487,34 @@ async function onStatementFiles(picked) {
     const groups = [];
     let failed = 0;
     let lastErr = null;
-    for (let i = 0; i < jobs.length; i++) {
-      if (jobs.length > 1) $('#al-text').textContent = t('loaderStatementN', i + 1, jobs.length);
-      stmtProgress(1);                   // AI 解析
-      try {
-        const txns = await parseStatementJob(jobs[i], names);
-        if (txns && txns.length) groups.push(txns);
-      } catch (err) {
-        failed += 1;
-        lastErr = err;
-        // 額度 / 頻率限制:後面的檔案也會失敗,直接停
-        if (['quota', 'rate', 'global'].includes(err.code)) { failed += jobs.length - i - 1; break; }
+    let done = 0;
+    let stop = false;
+    stmtProgress(1);                     // AI 解析
+    const showCount = () => {
+      if (jobs.length > 1) $('#al-text').textContent = t('loaderStatementN', Math.min(done + 1, jobs.length), jobs.length);
+    };
+    showCount();
+    // Pro 同時讀最多 3 個檔案;免費版一個一個讀(額度只有一份,同時送會繞過額度檢查)
+    const results = new Array(jobs.length);
+    let next = 0;
+    const worker = async () => {
+      while (!stop && next < jobs.length) {
+        const i = next++;
+        try {
+          results[i] = await parseStatementJob(jobs[i], names);
+        } catch (err) {
+          failed += 1;
+          lastErr = err;
+          // 額度 / 頻率限制:後面的檔案也會失敗,直接停
+          if (['quota', 'rate', 'global'].includes(err.code)) stop = true;
+        }
+        done += 1;
+        showCount();
       }
-    }
+    };
+    await Promise.all(Array.from({ length: isPro ? Math.min(3, jobs.length) : 1 }, worker));
+    failed += jobs.length - done;        // 因為額度停下、沒送出的檔案
+    for (const txns of results) if (txns && txns.length) groups.push(txns);
 
     const txns = mergeStatementTxns(groups);
     if (!txns.length) {
@@ -4585,16 +4616,17 @@ function renderRecon() {
       add.className = 'recon-add';
       add.type = 'button';
       add.textContent = t('reconAdd');
-      add.addEventListener('click', () => addFromStatement(i));
+      add.dataset.i = i;
       row.append(add);
     }
     reconListEl.append(row);
   }
 }
 
-async function addFromStatement(i) {
+// 先更新畫面再存檔:存檔慢或失敗都不會讓按鈕看起來「按了沒反應」
+function addFromStatement(i) {
   const r = reconRows[i];
-  if (!r || r.status === 'matched') return;
+  if (!r || r.status === 'matched') return false;
   const match = findCatByAiName(r.txn.category, 'expense');
   const fallback = catsOfType('expense').find((c) => c.id === 'other') || catsOfType('expense')[0];
   entries.push({
@@ -4609,17 +4641,31 @@ async function addFromStatement(i) {
     source: 'stmt',
   });
   r.status = 'matched';
-  await saveEntries(entries);
-  schedulePush();
-  renderList();
-  if (!viewReportEl.hidden) renderReport();
-  renderRecon();
+  return true;
 }
 
-$('#recon-add-all').addEventListener('click', async () => {
-  for (const [i, r] of reconRows.entries()) {
-    if (r.status === 'missing' || r.status === 'review') await addFromStatement(i);
+async function saveStatementAdds() {
+  renderRecon();
+  renderList();
+  if (!viewReportEl.hidden) renderReport();
+  try {
+    await saveEntries(entries);
+    schedulePush();
+  } catch {
+    showToast(t('saveFailed'));
   }
+}
+
+reconListEl.addEventListener('click', (e) => {
+  const btn = e.target.closest('.recon-add');
+  if (btn && addFromStatement(Number(btn.dataset.i))) saveStatementAdds();
+});
+$('#recon-add-all').addEventListener('click', () => {
+  let added = 0;
+  for (const [i, r] of reconRows.entries()) {
+    if ((r.status === 'missing' || r.status === 'review') && addFromStatement(i)) added += 1;
+  }
+  if (added) saveStatementAdds();
 });
 $('#recon-close').addEventListener('click', closeRecon);
 reconBackdropEl.addEventListener('click', closeRecon);
