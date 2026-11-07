@@ -471,7 +471,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.3';
-const WEB_BUILD = 31;
+const WEB_BUILD = 32;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2236,26 +2236,35 @@ async function onSave() {
     entries.push({ id: crypto.randomUUID(), createdAt: Date.now(), ...record });
   }
 
-  await saveEntries(entries);
-  schedulePush();
   closeSheet();
   renderList();
   if (!viewReportEl.hidden) renderReport();
   if (detailCatId !== null) renderCatDetail();
   // 只有新增才播;編輯既有記錄不該再演一次
   if (isNew) (record.type === 'income' ? moneyRain() : moneyBurn());
+  await persistEntries();
 }
 
 async function onDelete() {
   if (!editingId) return;
   if (!confirm(t('confirmDeleteEntry'))) return;
   entries = entries.filter((e) => e.id !== editingId);
-  await saveEntries(entries);
-  schedulePush();
   closeSheet();
   renderList();
   if (!viewReportEl.hidden) renderReport();
   if (detailCatId !== null) renderCatDetail();
+  await persistEntries();
+}
+
+// 畫面先更新再存檔:iPhone 的資料庫偶爾卡住幾秒,不能讓 Save / Delete 看起來按了沒反應。
+// 存不進去就明白告訴使用者。
+async function persistEntries() {
+  try {
+    await saveEntries(entries);
+    schedulePush();
+  } catch {
+    showToast(t('saveFailed'));
+  }
 }
 
 // ---------- 分類管理 ----------
@@ -4648,12 +4657,7 @@ async function saveStatementAdds() {
   renderRecon();
   renderList();
   if (!viewReportEl.hidden) renderReport();
-  try {
-    await saveEntries(entries);
-    schedulePush();
-  } catch {
-    showToast(t('saveFailed'));
-  }
+  await persistEntries();
 }
 
 reconListEl.addEventListener('click', (e) => {
