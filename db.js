@@ -1,6 +1,46 @@
 // 資料層：IndexedDB(idb-keyval 包一層)
 // 金額一律以「分」為單位的整數儲存(RM12.50 → 1250)
-import { get, set } from './lib/idb-keyval.js';
+import { get as idbGet, set as idbSet } from './lib/idb-keyval.js';
+
+// iOS WebKit 冷啟動時,第一次 indexedDB.open 偶爾要十幾秒才回應(模擬器不會)。
+// 1.5 秒還沒開好就再開一次,誰先開好用誰;四次都失敗才算失敗。
+const OPEN_RETRY_MS = 1500;
+const OPEN_MAX_TRIES = 4;
+export const dbStats = { tries: 0 };
+let dbPromise;
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    let failed = 0;
+    let timer;
+    const attempt = () => {
+      dbStats.tries += 1;
+      const req = indexedDB.open('keyval-store');
+      req.onupgradeneeded = () => req.result.createObjectStore('keyval');
+      req.onsuccess = () => {
+        if (settled) { req.result.close(); return; }
+        settled = true;
+        clearTimeout(timer);
+        const db = req.result;
+        db.onclose = () => { dbPromise = undefined; };
+        resolve(db);
+      };
+      req.onerror = () => {
+        failed += 1;
+        if (failed === OPEN_MAX_TRIES && !settled) { settled = true; reject(req.error); }
+      };
+      if (dbStats.tries < OPEN_MAX_TRIES) timer = setTimeout(() => { if (!settled) attempt(); }, OPEN_RETRY_MS);
+    };
+    attempt();
+  });
+  dbPromise.catch(() => { dbPromise = undefined; });
+  return dbPromise;
+}
+// 跟 idb-keyval 預設 store 同一個資料庫 / 表,舊資料照樣讀得到
+const store = (mode, fn) => openDB().then((db) => fn(db.transaction('keyval', mode).objectStore('keyval')));
+const get = (key) => idbGet(key, store);
+const set = (key, value) => idbSet(key, value, store);
 
 const KEY_ENTRIES = 'entries';
 const KEY_CATEGORIES = 'categories';

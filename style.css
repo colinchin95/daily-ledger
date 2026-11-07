@@ -1896,20 +1896,13 @@ body.has-ad .modal {
 }
 .auntie-loader[hidden] { display: none; }
 .auntie-loader.show { opacity: 1; pointer-events: auto; }
-/* 啟動:載入快就不出現;慢(冷啟動)才在 0.6 秒後淡入;20 秒保險自動消失 */
-.auntie-loader.boot { animation: al-boot 20s linear forwards; pointer-events: auto; }
-@keyframes al-boot {
-  0%, 3% { opacity: 0; }
-  5%, 98% { opacity: 1; }
-  100% { opacity: 0; visibility: hidden; }
-}
 .al-card {
   width: min(260px, 72vw); padding: 14px 14px 16px; border-radius: 26px;
   background: #F7E2C7;   /* 與影片底色一致 */
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
   text-align: center; transform: scale(0.96); transition: transform 0.25s var(--spring, ease);
 }
-.auntie-loader.show .al-card, .auntie-loader.boot .al-card { transform: scale(1); }
+.auntie-loader.show .al-card { transform: scale(1); }
 .al-video {
   width: 100%; aspect-ratio: 1; display: block; border-radius: 18px; object-fit: cover;
   background: #F7E2C7 url('icons/loader/auntie-counting.jpg') center / cover no-repeat;

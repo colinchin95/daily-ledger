@@ -1,7 +1,7 @@
 import {
   getEntries, saveEntries, getCategories, saveCategories,
   getMeta, saveMeta, getRecurring, saveRecurring,
-  getAccounts, saveAccounts,
+  getAccounts, saveAccounts, dbStats,
 } from './db.js';
 import { moneyRain, moneyBurn } from './entry-fx.js';
 import { parseCsv, reconcile, parseWithAI } from './reconcile.js';
@@ -470,7 +470,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.2';
-const WEB_BUILD = 29;
+const WEB_BUILD = 30;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -3712,7 +3712,6 @@ let loaderDepth = 0;
 function showLoader(textKey = 'loaderBoot') {
   const el = $('#auntie-loader');
   loaderDepth += 1;
-  el.classList.remove('boot');
   // 巢狀時保留外層文字(背面輕點 →「reading your payment」)
   if (loaderDepth === 1) $('#al-text').textContent = t(textKey);
   el.hidden = false;
@@ -3733,7 +3732,7 @@ function hideLoader(force = false) {
   const el = $('#auntie-loader');
   loaderDepth = force ? 0 : Math.max(0, loaderDepth - 1);
   if (loaderDepth > 0) return;
-  el.classList.remove('show', 'boot');
+  el.classList.remove('show');
   setTimeout(() => {
     if (loaderDepth > 0) return;
     el.hidden = true;
@@ -5327,7 +5326,7 @@ function renderQuickAddPage() {
 }
 
 // ---------- 啟動 ----------
-// 啟動計時:超過 3 秒(或出錯、靠 15 秒保險收起)才寫進掃描紀錄,Copy scan log 就看得到卡在哪一步。
+// 啟動計時:超過 3 秒(或出錯、15 秒還沒好)才寫進掃描紀錄,Copy scan log 就看得到卡在哪一步。
 // ms 從頁面開始載入算起;code 記當下 visibilityState(背景啟動時計時器會被放慢)。
 const BOOT_SLOW_MS = 3000;
 const bootMarks = [];
@@ -5364,6 +5363,7 @@ async function init() {
     bootStep('entries', getEntries()), bootStep('categories', getCategories()), bootStep('meta', getMeta()),
     bootStep('recurring', getRecurring()), bootStep('accounts', getAccounts()),
   ]);
+  if (dbStats.tries > 1) bootMark(`db_open_tries:${dbStats.tries}`);
   await materializeRecurring();   // 補當月固定支出
   bootMark('recurring_done');
   renderList();
@@ -5371,7 +5371,6 @@ async function init() {
   maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
   maybeShowBackupBanner();        // 太久沒備份就提醒
   maybeShowBacktapBanner();       // iOS:引導設定背面輕點記帳
-  hideLoader(true);               // 啟動動畫收起(資料已載入)
   bootMark('ready');
   flushBootLog();
   initQuickAdd();                 // 背面輕點 / 捷徑 / 長按圖示 → 直接記帳
@@ -5388,10 +5387,9 @@ async function init() {
 }
 
 init().catch((e) => { bootMark(`error:${e?.name || 'error'}`); flushBootLog(); });
-// 保險:啟動出錯也不要讓 loading 一直蓋著畫面
+// 15 秒還沒載好:先把已經走到的步驟記下來
 setTimeout(() => {
-  if (!$('#auntie-loader').classList.contains('boot')) return;
-  hideLoader(true);
-  bootMark('fallback_15s');
+  if (bootMarks.some((m) => m.stage === 'ready')) return;
+  bootMark('not_ready_15s');
   flushBootLog();
 }, 15000);
