@@ -471,7 +471,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.3';
-const WEB_BUILD = 32;
+const WEB_BUILD = 33;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -2241,7 +2241,11 @@ async function onSave() {
   if (!viewReportEl.hidden) renderReport();
   if (detailCatId !== null) renderCatDetail();
   // 只有新增才播;編輯既有記錄不該再演一次
-  if (isNew) (record.type === 'income' ? moneyRain() : moneyBurn());
+  if (isNew) {
+    const fx = record.type === 'income' ? moneyRain() : moneyBurn();
+    // 沒播出來就記一筆(Copy scan log 看得到原因:reduce_motion / no_canvas / busy / error)
+    if (fx !== 'played') logScan(newScanDiag('fx'), record.type === 'income' ? 'rain_skip' : 'burn_skip', fx);
+  }
   await persistEntries();
 }
 
@@ -3784,7 +3788,11 @@ async function fileToBase64(file, maxDim = 1280, quality = 0.7) {
   cv.width = w;
   cv.height = h;
   cv.getContext('2d').drawImage(img, 0, 0, w, h);
-  return cv.toDataURL('image/jpeg', quality).split(',')[1];
+  const out = cv.toDataURL('image/jpeg', quality).split(',')[1];
+  // 用完把畫布縮成 0:iPhone 的 canvas 記憶體有上限,一次匯入多張照片時不能留著等垃圾回收
+  cv.width = 0;
+  cv.height = 0;
+  return out;
 }
 
 // Apple 5.1.2:把使用者的財務文件送到第三方(Anthropic)前,必須先明確告知並取得同意。

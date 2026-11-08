@@ -11,6 +11,7 @@ const BURN_EMBERS = 60;
 const BURN_MS = 1800;
 
 let running = false;
+let runningSince = 0;
 
 const rand = (a, b) => a + Math.random() * (b - a);
 
@@ -26,22 +27,32 @@ function roundRectPath(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// 共用疊層:建立 canvas、驅動 rAF、到時自動收拾
+// 共用疊層:建立 canvas、驅動 rAF、到時自動收拾。
+// 回傳 'played' 或沒播的原因('busy' / 'reduce_motion' / 'no_canvas' / 'error'),給掃描紀錄用。
 function overlay(durationMs, setup) {
-  if (running) return;
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  running = true;
+  if (running) {
+    // 上一段還在播是正常的;卡超過兩倍時長代表收尾沒跑到,直接重置,不讓特效從此消失
+    if (performance.now() - runningSince < durationMs * 2 + 1000) return 'busy';
+    running = false;
+  }
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return 'reduce_motion';
 
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const cv = document.createElement('canvas');
+  // iPhone 的 WebView 對 canvas 總記憶體有上限;超過時 getContext 回傳 null。
+  // 以前直接用 null 會丟例外,running 永遠是 true,之後每一筆都不再播動畫。
+  const ctx = cv.getContext('2d');
+  if (!ctx) return 'no_canvas';
+
   cv.setAttribute('aria-hidden', 'true');
   Object.assign(cv.style, {
     position: 'fixed', inset: '0', width: '100%', height: '100%',
     pointerEvents: 'none', zIndex: '9999',
   });
-  document.body.appendChild(cv);
 
-  const ctx = cv.getContext('2d');
+  let raf = 0;
+  let done = false;
+  let guard = 0;
   const size = { w: 0, h: 0 };
   const resize = () => {
     size.w = cv.clientWidth; size.h = cv.clientHeight;
@@ -49,13 +60,6 @@ function overlay(durationMs, setup) {
     cv.height = Math.round(size.h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   };
-  resize();
-  addEventListener('resize', resize);
-
-  const draw = setup(ctx, size);
-  const start = performance.now();
-  let raf = 0;
-  let done = false;
 
   const finish = () => {
     if (done) return;
@@ -64,25 +68,46 @@ function overlay(durationMs, setup) {
     clearTimeout(guard);
     removeEventListener('resize', resize);
     cv.remove();
+    // 把畫布縮成 0,iPhone 才會馬上歸還這塊記憶體(只 remove 要等垃圾回收)
+    cv.width = 0;
+    cv.height = 0;
     running = false;
   };
 
-  // App 切到背景時 rAF 會被凍結,frame() 就永遠跑不到結尾 → running 卡住,
-  // 之後所有特效都不再播。用計時器兜底(計時器在背景仍會觸發,只是被降頻)。
-  const guard = setTimeout(finish, durationMs + 400);
+  running = true;
+  runningSince = performance.now();
+  try {
+    document.body.appendChild(cv);
+    resize();
+    addEventListener('resize', resize);
+    const draw = setup(ctx, size);
+    const start = performance.now();
 
-  const frame = (now) => {
-    const t = now - start;
-    if (t >= durationMs) return finish();
-    const fadeMs = Math.min(700, durationMs * 0.3);
-    const fade = t > durationMs - fadeMs ? 1 - (t - (durationMs - fadeMs)) / fadeMs : 1;
-    ctx.clearRect(0, 0, size.w, size.h);
-    ctx.globalAlpha = fade;
-    draw(t, fade);
-    ctx.globalAlpha = 1;
+    // App 切到背景時 rAF 會被凍結,frame() 就永遠跑不到結尾 → running 卡住,
+    // 之後所有特效都不再播。用計時器兜底(計時器在背景仍會觸發,只是被降頻)。
+    guard = setTimeout(finish, durationMs + 400);
+
+    const frame = (now) => {
+      try {
+        const t = now - start;
+        if (t >= durationMs) return finish();
+        const fadeMs = Math.min(700, durationMs * 0.3);
+        const fade = t > durationMs - fadeMs ? 1 - (t - (durationMs - fadeMs)) / fadeMs : 1;
+        ctx.clearRect(0, 0, size.w, size.h);
+        ctx.globalAlpha = fade;
+        draw(t, fade);
+        ctx.globalAlpha = 1;
+        raf = requestAnimationFrame(frame);
+      } catch {
+        finish();
+      }
+    };
     raf = requestAnimationFrame(frame);
-  };
-  raf = requestAnimationFrame(frame);
+    return 'played';
+  } catch {
+    finish();
+    return 'error';
+  }
 }
 
 /* ---------------- 收入:天降金雨 ---------------- */
@@ -166,7 +191,7 @@ function drawBill(ctx, b, t, char = 0) {
 }
 
 export function moneyRain() {
-  overlay(RAIN_MS, (ctx, size) => {
+  return overlay(RAIN_MS, (ctx, size) => {
     const { w, h } = size;
     const bills = Array.from({ length: RAIN_BILLS }, () => makeBill(w, h));
     const sparks = Array.from({ length: RAIN_SPARKS }, () => makeSpark(w, h));
@@ -241,7 +266,7 @@ function makeEmber(w, h) {
 }
 
 export function moneyBurn() {
-  overlay(BURN_MS, (ctx, size) => {
+  return overlay(BURN_MS, (ctx, size) => {
     const { w, h } = size;
     const bills = Array.from({ length: BURN_BILLS }, () => makeBurnBill(w, h));
     const embers = Array.from({ length: BURN_EMBERS }, () => makeEmber(w, h));
