@@ -470,7 +470,7 @@ let currency = (() => {
 
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
-const APP_MARKETING_VERSION = '1.5.3';
+const APP_MARKETING_VERSION = '1.5.4';
 const WEB_BUILD = 34;
 
 function t(key, ...args) {
