@@ -471,7 +471,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.3';
-const WEB_BUILD = 33;
+const WEB_BUILD = 34;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -501,6 +501,7 @@ function buildFormatters() {
 }
 
 function shortDate(dateStr) {
+  if (!isValidYmd(dateStr)) return String(dateStr || '—');   // 壞日期丟給 Intl 會 RangeError,整個畫面就停了
   const [y, m, d] = dateStr.split('-').map(Number);
   return shortDateFmt.format(new Date(y, m - 1, d));
 }
@@ -570,7 +571,28 @@ function ymd(d) {
 
 const todayStr = () => ymd(new Date());
 
+// 真的存在的 YYYY-MM-DD。AI 讀對帳單偶爾回空字串、缺年份或 02-31 這種日期
+function isValidYmd(s) {
+  const m = typeof s === 'string' && /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (!m) return false;
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return d.getFullYear() === +m[1] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[3];
+}
+
+// 帳本裡日期壞掉的紀錄改成建立當天(沒有建立時間就今天)。回傳修了幾筆
+function repairEntryDates() {
+  let fixed = 0;
+  for (const e of entries) {
+    if (isValidYmd(e.date)) continue;
+    const at = Number(e.createdAt);
+    e.date = at > 0 ? ymd(new Date(at)) : todayStr();
+    fixed += 1;
+  }
+  return fixed;
+}
+
 function dateLabel(dateStr) {
+  if (!isValidYmd(dateStr)) return String(dateStr || '—');
   const [y, m, d] = dateStr.split('-').map(Number);
   const label = dateFmt.format(new Date(y, m - 1, d));
   if (dateStr === todayStr()) return `${t('today')} · ${label}`;
@@ -4654,7 +4676,7 @@ function addFromStatement(i) {
     accountId: defaultAcctId(),
     categoryId: (match || fallback)?.id ?? null,
     note: (r.txn.label || r.txn.desc || '').slice(0, 60),
-    date: r.txn.date,
+    date: isValidYmd(r.txn.date) ? r.txn.date : todayStr(),   // AI 沒讀到日期也不能存壞日期
     source: 'stmt',
   });
   r.status = 'matched';
@@ -5395,7 +5417,8 @@ function bootMark(stage) {
 function flushBootLog() {
   const done = bootMarks[bootMarks.length - 1];
   const slow = done && done.at - performance.timeOrigin >= BOOT_SLOW_MS;
-  if (!bootLogged && !slow && done?.stage === 'ready') return;
+  const notable = bootMarks.some((m) => /^(fail_|fixed_)/.test(m.stage));
+  if (!bootLogged && !slow && !notable && done?.stage === 'ready') return;
   try {
     const rows = readScanLog();
     for (const m of bootMarks.slice(bootLogged)) {
@@ -5422,13 +5445,22 @@ async function init() {
     bootStep('recurring', getRecurring()), bootStep('accounts', getAccounts()),
   ]);
   if (dbStats.tries > 1) bootMark(`db_open_tries:${dbStats.tries}`);
-  await materializeRecurring();   // 補當月固定支出
+  const fixedDates = repairEntryDates();   // 舊版對帳單匯入可能存了壞日期,每次開 App 都會讓畫面當掉
+  if (fixedDates) {
+    bootMark(`fixed_dates:${fixedDates}`);
+    persistEntries().catch(() => {});
+  }
+  // 任何一步畫面出錯都不能擋住後面的背面輕點、同步、Pro 檢查
+  const safely = (stage, fn) => {
+    try { return fn(); } catch (e) { bootMark(`fail_${stage}:${e?.name || 'error'}:${String(e?.message || '').slice(0, 40)}`); }
+  };
+  try { await materializeRecurring(); } catch (e) { bootMark(`fail_recurring:${e?.name || 'error'}`); }   // 補當月固定支出
   bootMark('recurring_done');
-  renderList();
-  switchView('report');           // 預設開在「報表」頁
-  maybeShowProtectBanner();       // 有資料但沒開同步 → 提醒保護資料
-  maybeShowBackupBanner();        // 太久沒備份就提醒
-  maybeShowBacktapBanner();       // iOS:引導設定背面輕點記帳
+  safely('list', renderList);
+  safely('report', () => switchView('report'));   // 預設開在「報表」頁
+  safely('protect', maybeShowProtectBanner);      // 有資料但沒開同步 → 提醒保護資料
+  safely('backup', maybeShowBackupBanner);        // 太久沒備份就提醒
+  safely('backtap', maybeShowBacktapBanner);      // iOS:引導設定背面輕點記帳
   bootMark('ready');
   flushBootLog();
   initQuickAdd();                 // 背面輕點 / 捷徑 / 長按圖示 → 直接記帳

@@ -209,5 +209,8 @@ export async function parseWithAI({ kind, data, mediaType, categories, installId
     throw err;
   }
   const r = await res.json();
-  return Array.isArray(r.transactions) ? r.transactions : [];
+  // AI 的日期統一成 YYYY-MM-DD;讀不出來就給空字串(加入帳本時會改成今天),絕不把怪格式帶進帳本
+  return Array.isArray(r.transactions)
+    ? r.transactions.map((t) => ({ ...t, date: parseDate(t?.date) || '' }))
+    : [];
 }
