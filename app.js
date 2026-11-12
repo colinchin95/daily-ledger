@@ -471,7 +471,7 @@ let currency = (() => {
 // App 版本(與 sw.js 的 VERSION 同步,顯示在設定頁)
 // 對外只顯示行銷版本(和 App Store 一致);build 號用小字。原生殼層從 App.getInfo() 讀真實值。
 const APP_MARKETING_VERSION = '1.5.4';
-const WEB_BUILD = 34;
+const WEB_BUILD = 35;
 
 function t(key, ...args) {
   const v = STRINGS[lang][key];
@@ -754,6 +754,13 @@ function aiCategoryLabels(type = 'expense') {
     for (const sub of subCatsOf(top.id)) out.push(catLabel(sub, cats));
   }
   return out;
+}
+// 開機前就要送圖辨識時,分類還沒從資料庫載入,用上次存下的清單
+const AI_CATS_CACHE_KEY = 'ra-ai-cats';
+function cacheAiCats() {
+  const labels = aiCategoryLabels('expense');
+  if (labels.length) { try { localStorage.setItem(AI_CATS_CACHE_KEY, JSON.stringify(labels)); } catch {} }
+  return labels;
 }
 function findCatByAiName(name, type = 'expense') {
   if (!name) return null;
@@ -3925,11 +3932,12 @@ async function scanDialog(show) {
 
 // 送一張圖給 Worker,自動重試網路錯誤 / 逾時 / 5xx。結果一律以回傳值表示,不丟連線類例外。
 // 回傳 { code: 'ok', data } | { code: 'quota', limit } | { code: 'rate', retryAfter } | { code: 'busy' } | { code: 'failed' }
-async function requestReceipt(image, diag) {
+async function requestReceipt(image, diag, cats = null) {
+  if (!cats) cats = cacheAiCats();
   const body = JSON.stringify({
     image,
     mediaType: 'image/jpeg',
-    categories: aiCategoryLabels('expense'),
+    categories: cats,
     installId: getInstallId(),
     scanKey: diag.scanKey,
   });
@@ -4027,7 +4035,7 @@ function applyScanResult(r) {
 
 // 辨識一張圖並把結果告訴使用者(面板要先開好、AI 同意要先取得)。
 // 回傳結果碼:filled / gave_up / blank / quota / rate / busy。沒有「什麼都沒發生」這種結果。
-async function runScanFlow(image, diag, loaderKey) {
+async function runScanFlow(image, diag, loaderKey, pre = null) {
   const btn = $('#receipt-btn');
   const label = btn.querySelector('.receipt-label');
   const original = label.textContent;
@@ -4039,7 +4047,9 @@ async function runScanFlow(image, diag, loaderKey) {
       let res;
       showLoader(loaderKey);
       try {
-        res = await requestReceipt(image, diag);
+        const early = pre;   // 背面輕點先送出去的那一次,只用一次;使用者按重試才重新送
+        pre = null;
+        res = early ? await early : await requestReceipt(image, diag);
         if (res.code === 'ok') {
           const r = res.data;
           if (typeof r.amount === 'number' && r.amount > 0) {
@@ -4920,6 +4930,7 @@ function initQuickAdd() {
   // 資料載入完才開放給原生呼叫;原生端會一直等到這個函式出現
   window.__raScan = raScan;
   window.__raApplePay = raApplePay;
+  markScanReady(true);
   // PWA 捷徑:./?action=add
   if (handleQuickAddUrl(location.href)) {
     history.replaceState(null, '', location.pathname);
@@ -5082,7 +5093,7 @@ function rememberScanDone(id) {
 }
 
 // 開面板 → AI 同意 → 辨識 → (可選)自動存檔。回傳結果碼。
-async function scanIntoSheet(id, b64, diag) {
+async function scanIntoSheet(id, b64, diag, pre = null) {
   await waitVisible();
   while (sheetOccupied()) {
     // 不蓋掉上一筆填好的面板,也不蓋掉使用者正在輸入的內容
@@ -5100,7 +5111,7 @@ async function scanIntoSheet(id, b64, diag) {
     showToast(t('scanCancelled'));
     return 'consent_declined';
   }
-  const outcome = await runScanFlow(b64, diag, 'loaderScreenshot');
+  const outcome = await runScanFlow(b64, diag, 'loaderScreenshot', pre);
   if (outcome !== 'filled' || (await warnScanDate(diag)) || !autoSaveScans()) return outcome;
   // 自動存檔:AI 沒給分類就放「Other」,金額一定要有
   if (!selectedCatId) {
@@ -5119,12 +5130,16 @@ async function scanIntoSheet(id, b64, diag) {
 }
 
 async function runScanJob(id, b64) {
-  const diag = newScanDiag('tap');
+  const early = takePrefetch(id, b64);
+  const diag = early?.diag || newScanDiag('tap');
+  let pre = early?.promise || null;
   logScan(diag, 'start');
   for (;;) {
     let outcome;
     try {
-      outcome = await scanIntoSheet(id, b64, diag);
+      const p = pre;
+      pre = null;
+      outcome = await scanIntoSheet(id, b64, diag, p);
     } catch (e) {
       // 任何沒料到的例外(quickAdd、存檔…)都走同一個重試提示,絕不安靜消失
       logScan(diag, 'exception', e?.name || 'error');
@@ -5153,6 +5168,7 @@ function raScan(id, b64) {
   if (typeof b64 !== 'string' || !b64) return Promise.resolve({ ok: false, outcome: 'bad_input' });
   if (id && scanJobs.has(id)) return scanJobs.get(id);
   if (id && scanAlreadyDone(id)) return Promise.resolve({ ok: true, outcome: 'already_done' });
+  prefetchScan(id, b64);   // 先送去辨識,不等前一筆結案、面板打開
   // 一次處理一筆:下一筆等上一筆結案、面板關閉後才開始
   const job = scanChain
     .then(() => runScanJob(id, b64))
@@ -5167,6 +5183,43 @@ function raScan(id, b64) {
   }
   return job;
 }
+
+// 先送圖:原生一交圖就開始辨識,和 App 開機、開面板同時進行,不用排隊等。
+// 只在使用者已同意 AI 時才送;結果先放著,輪到這張時 runScanFlow 直接拿來用。
+const scanPrefetches = new Map();   // id(或圖本身)→ { diag, promise }
+const SCAN_PREFETCH_MAX = 5;
+function prefetchScan(id, b64) {
+  const key = id || b64;
+  if (typeof b64 !== 'string' || !b64 || scanPrefetches.has(key)) return;
+  if (id && (scanJobs.has(id) || scanAlreadyDone(id))) return;
+  try { if (localStorage.getItem('aiConsent:receipt') !== '1') return; } catch { return; }
+  let cats = categories.length ? aiCategoryLabels('expense') : null;
+  if (!cats) { try { cats = JSON.parse(localStorage.getItem(AI_CATS_CACHE_KEY)); } catch {} }
+  if (!Array.isArray(cats) || !cats.length) return;   // 分類還沒載入、也沒快取:等開機完再送,AI 才分得了類
+  const diag = newScanDiag('tap');
+  logScan(diag, 'prefetch');
+  const promise = requestReceipt(b64, diag, cats).catch((e) => {
+    logScan(diag, 'exception', e?.name || 'error');
+    return { code: 'failed' };
+  });
+  scanPrefetches.set(key, { diag, promise });
+  if (scanPrefetches.size > SCAN_PREFETCH_MAX) scanPrefetches.delete(scanPrefetches.keys().next().value);
+}
+function takePrefetch(id, b64) {
+  const key = id || b64;
+  const hit = scanPrefetches.get(key);
+  scanPrefetches.delete(key);
+  return hit;
+}
+
+// 開機還沒完成就先掛上入口:原生馬上交圖、馬上開始辨識;面板等開機完成(initQuickAdd)才動
+let markScanReady;
+const scanReady = new Promise((r) => { markScanReady = r; });
+window.__raScan = (id, b64) => {
+  if (b64 === undefined) { b64 = id; id = null; }
+  prefetchScan(id, b64);
+  return scanReady.then((ok) => (ok ? raScan(id, b64) : { ok: false, outcome: 'not_ready' }));
+};
 
 // 用戶在自己 iPhone 做好捷徑 → 分享 → 拷貝 iCloud 連結,貼在這裡就變成一鍵加入。
 // 空字串時退回手動教學 + 打開捷徑 App。
@@ -5463,6 +5516,7 @@ async function init() {
   safely('backtap', maybeShowBacktapBanner);      // iOS:引導設定背面輕點記帳
   bootMark('ready');
   flushBootLog();
+  safely('ai_cats', cacheAiCats);
   initQuickAdd();                 // 背面輕點 / 捷徑 / 長按圖示 → 直接記帳
 
   // PWA:註冊 service worker(需要 https 或 localhost)。
@@ -5476,7 +5530,15 @@ async function init() {
   checkEntitlement();  // 查詢 Pro 狀態
 }
 
-init().catch((e) => { bootMark(`error:${e?.name || 'error'}`); flushBootLog(); });
+init().catch((e) => {
+  bootMark(`error:${e?.name || 'error'}`);
+  flushBootLog();
+  // 開機失敗:收回先掛上的入口,原生才會照舊顯示「截圖已存好」並稍後重送
+  if (window.__raScan !== raScan) {
+    delete window.__raScan;
+    markScanReady(false);
+  }
+});
 // 15 秒還沒載好:先把已經走到的步驟記下來
 setTimeout(() => {
   if (bootMarks.some((m) => m.stage === 'ready')) return;
